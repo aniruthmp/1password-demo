@@ -158,7 +158,7 @@ assert response.json()["status"] == "completed"
 
 ---
 
-### **Phase 4: ACP Server (1-2 hours)** 🌐
+### **Phase 4: ACP Server (1-2 hours)** ✅
 **Goal:** Framework-agnostic REST API with session management
 
 ```
@@ -318,7 +318,7 @@ Output: Demo-ready, validated system
 │    └─ Agent-to-agent collaboration working                      │
 │    └─ Demo scenario 2 working                                   │
 │                                                                 │
-│  □ ACP Protocol Operational                     [Phase 4 Done]  │
+│  ✅ ACP Protocol Operational                     [Phase 4 Done]  │
 │    └─ REST endpoints responding                                 │
 │    └─ Session management working                                │
 │    └─ Demo scenario 3 working                                   │
@@ -353,9 +353,9 @@ Output: Demo-ready, validated system
 ```
 ✅ MCP Server: get_credentials tool operational
 ✅ A2A Server: Agent card + task execution
-□  ACP Server: /agents + /run + /sessions
+✅ ACP Server: /agents + /run + /sessions
 
-Target: 2/3 protocols complete (67%)
+Target: 3/3 protocols complete (100%)
 ```
 
 ### **Security**

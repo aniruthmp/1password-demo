@@ -354,6 +354,161 @@ poetry run python scripts/test_phase3.py
 
 ---
 
+### Phase 4: ACP Server Testing
+**Script:** `test_phase4.py`  
+**Tests:** Agent Communication Protocol server implementation
+
+```bash
+# Step 1: Start the ACP server (in a separate terminal)
+cd backend
+
+# Option 1: Use the launcher script (recommended)
+./scripts/acp_server.sh
+
+# Option 2: Direct Python command
+poetry run python src/acp/run_acp.py
+
+# Step 2: Run the test script (in another terminal)
+cd backend
+poetry run python scripts/test_phase4.py
+```
+
+**What it tests:**
+- ✅ ACP server connectivity and health
+- ✅ Agent discovery via /agents endpoint
+- ✅ Natural language credential requests
+- ✅ Intent parsing (database, API, SSH extraction)
+- ✅ Session management and tracking
+- ✅ Interaction history retrieval
+- ✅ Multiple credential types in same session
+- ✅ Error handling and validation
+- ✅ Credential provisioning via ACP protocol
+
+**Prerequisites:**
+- Phase 1, 2, and 3 components working
+- ACP server running on http://localhost:8001
+- Valid credentials in `.env` file
+- At least one item in your 1Password vault
+
+**Example interaction:**
+```
+============================================================
+  Phase 4 Validation Test - ACP Server
+============================================================
+
+1. Server Connectivity Check
+----------------------------------------------------------------------
+   ✅ ACP server is running
+     Status: healthy
+     Service: acp-server
+     Version: 1.0.0
+
+2. Agent Discovery
+----------------------------------------------------------------------
+   ✅ Agent discovery successful
+     Found 1 agent(s)
+
+     Agent Information:
+       Name: credential-broker
+       Description: Ephemeral credential provisioning from...
+       Version: 1.0.0
+
+     Capabilities (6 total):
+       • database_credentials
+       • api_credentials
+       • ssh_credentials
+       • generic_secrets
+       • natural_language_parsing
+       • session_management
+
+3. Natural Language Credential Requests
+----------------------------------------------------------------------
+   Testing multiple credential types with session management...
+
+   Test 3.1: Database Credentials
+     Request: 'I need database credentials for production-postgres'
+
+   ✅ Request completed successfully
+     Status: completed
+     Run ID: run-123e4567...
+     Session ID: session-123e4567...
+     Execution Time: 234.56ms
+
+     Output:
+       Text Response:
+         ✅ Generated ephemeral database credentials for production-postgres.
+         Token expires in 5 minutes (300 seconds).
+       JWT Token:
+         eyJhbGciOiJIUzI1N... (truncated)
+
+... (continues with API and SSH credential tests)
+
+4. Session History
+----------------------------------------------------------------------
+   ✅ Session history retrieved
+     Session ID: session-123e4567...
+     Interaction Count: 3
+
+     Interaction History:
+       1. 2025-10-23T12:34:56Z
+          Run ID: run-abc...
+          Status: completed
+          Input: I need database credentials for...
+          Output: Generated ephemeral database credentials...
+
+... (continues with error handling tests)
+```
+
+---
+
+### ACP Server Launcher
+**Script:** `acp_server.sh`  
+**Purpose:** Start the ACP (Agent Communication Protocol) server with proper environment setup
+
+```bash
+cd backend
+
+# Basic usage (default settings)
+./scripts/acp_server.sh
+
+# Custom port
+./scripts/acp_server.sh --port 8002
+
+# Development mode with auto-reload
+./scripts/acp_server.sh --reload --log-level DEBUG
+
+# Production mode with multiple workers
+./scripts/acp_server.sh --workers 4
+
+# Show help
+./scripts/acp_server.sh --help
+```
+
+**What it does:**
+- ✅ Verifies .env file exists and loads environment variables
+- ✅ Checks for required environment variables
+- ✅ Verifies Poetry installation
+- ✅ Ensures dependencies are installed
+- ✅ Checks if port is available before starting
+- ✅ Starts ACP server with proper configuration
+- ✅ Displays API endpoints and documentation URL
+- ✅ Handles graceful shutdown on Ctrl+C
+
+**Available Options:**
+- `--port PORT` - Set server port (default: 8001)
+- `--host HOST` - Set server host (default: 0.0.0.0)
+- `--log-level LEVEL` - Set logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+- `--reload` - Enable auto-reload for development
+- `--workers N` - Number of worker processes (default: 1)
+
+**Prerequisites:**
+- Poetry installed
+- .env file configured with 1Password credentials
+- Dependencies installed (`poetry install`)
+- Port 8001 available (or use `--port` to specify different port)
+
+---
+
 ## 🔧 Troubleshooting
 
 ### Common Issues
@@ -446,6 +601,52 @@ poetry run python src/a2a/run_a2a.py --port 8001
 2. Verify all required parameters provided
 3. Ensure resource exists in 1Password vault
 
+#### "ACP server not accessible"
+**Causes:**
+- ACP server not running
+- Port 8001 already in use
+- Firewall blocking connections
+
+**Solution:**
+```bash
+# Check if server is running
+curl http://localhost:8001/health
+
+# Start the server if not running
+poetry run python src/acp/run_acp.py
+
+# Check if port 8001 is in use
+lsof -i :8001
+
+# Try a different port
+poetry run python src/acp/run_acp.py --port 8002
+```
+
+#### "Intent parsing failed"
+**Causes:**
+- Request text too vague or ambiguous
+- Resource name not recognized
+- Missing keywords
+
+**Solution:**
+1. Use clear, specific language:
+   - ✅ "I need database credentials for production-postgres"
+   - ❌ "Get me some creds"
+2. Include resource type keywords (database, api, ssh)
+3. Include resource name explicitly
+4. Check demo examples for proper formatting
+
+#### "Session not found"
+**Causes:**
+- Session ID doesn't exist
+- Session expired
+- Server restarted (in-memory sessions lost)
+
+**Solution:**
+1. Verify session ID is correct
+2. Check if server was restarted
+3. Create new session if needed (omit session_id in request)
+
 ---
 
 ## 📊 Test Coverage
@@ -479,6 +680,25 @@ poetry run python src/a2a/run_a2a.py --port 8001
 - SSE streaming support (via endpoints)
 - Integration with Phase 1 components
 
+### Phase 4 Tests Cover:
+- ACP server initialization and health
+- Agent discovery via /agents endpoint
+- Natural language intent parsing:
+  - Database credential requests
+  - API credential requests
+  - SSH key requests
+  - Generic secret requests
+- Session management and creation
+- Interaction history tracking
+- Multi-request sessions (conversation context)
+- Session history retrieval
+- Error handling:
+  - Unknown agent names
+  - Unparseable requests
+  - Nonexistent sessions
+- Integration with Phase 1 components
+- All REST endpoints (/agents, /run, /sessions/{id}, /health)
+
 ---
 
 ## 🎯 Next Steps
@@ -488,13 +708,13 @@ After successfully running all test scripts:
 1. ✅ **Phase 1:** Core Foundation ✅ COMPLETE
 2. ✅ **Phase 2:** MCP Server ✅ COMPLETE
 3. ✅ **Phase 3:** A2A Server ✅ COMPLETE
-4. **Phase 4:** Implement ACP (Agent Communication Protocol) server
+4. ✅ **Phase 4:** ACP Server ✅ COMPLETE
 5. **Phase 5:** Add Docker orchestration
 6. **Phase 6:** Create demo UI (optional)
 7. **Phase 7:** Complete documentation
 8. **Phase 8:** Final validation
 
-**Current Progress:** 3/8 phases complete (37.5%)
+**Current Progress:** 4/8 phases complete (50%)
 
 ---
 
@@ -521,6 +741,6 @@ If you encounter issues:
 ---
 
 **Last Updated:** October 23, 2025  
-**Status:** Phase 1, 2 & 3 Complete ✅  
-**Progress:** 3/8 phases (37.5%)
+**Status:** Phase 1, 2, 3 & 4 Complete ✅  
+**Progress:** 4/8 phases (50%)
 
