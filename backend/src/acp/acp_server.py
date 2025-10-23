@@ -35,6 +35,7 @@ from pydantic import BaseModel, Field
 from src.core.credential_manager import CredentialManager
 from src.core.audit_logger import AuditLogger
 from src.core.logging_config import configure_logging
+from src.core.metrics import get_metrics_collector, MetricsTimer
 
 # Setup logging
 configure_logging(log_level="INFO")
@@ -489,6 +490,26 @@ async def health_check():
     )
 
 
+@app.get("/status")
+async def get_status():
+    """
+    Get server status and comprehensive metrics.
+
+    Returns:
+        Server status with performance metrics and statistics
+    """
+    metrics = get_metrics_collector()
+    metrics_data = metrics.get_metrics_dict()
+    
+    return {
+        "service": "acp-server",
+        "version": "1.0.0",
+        "protocol": "ACP",
+        "available_agents": ["credential-broker"],
+        **metrics_data,
+    }
+
+
 @app.get("/agents", response_model=AgentsResponse)
 async def list_agents():
     """
@@ -614,6 +635,13 @@ async def run_agent(request: ACPRunRequest):
             ttl_minutes=intent["duration_minutes"],
         )
 
+        # Calculate execution time
+        execution_time = (time.time() - start_time) * 1000
+
+        # Record success metrics
+        metrics = get_metrics_collector()
+        metrics.record_request("acp", intent["resource_type"], True, execution_time)
+
         # Log to audit trail
         await audit_logger.log_credential_access(
             protocol="ACP",
@@ -672,6 +700,13 @@ async def run_agent(request: ACPRunRequest):
         )
 
     except Exception as e:
+        execution_time = (time.time() - start_time) * 1000
+        
+        # Record failure metrics
+        metrics = get_metrics_collector()
+        resource_type = intent.get('resource_type', 'unknown') if 'intent' in locals() else 'unknown'
+        metrics.record_request("acp", resource_type, False, execution_time)
+        
         logger.error(f"❌ Run execution failed: {e}", exc_info=True)
 
         # Log to audit trail

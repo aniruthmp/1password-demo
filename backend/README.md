@@ -12,6 +12,9 @@ This is the backend implementation of the Universal 1Password Agent Credential B
 
 ### Phase 1: Core Foundation ✅ Complete
 ### Phase 2: MCP Server ✅ Complete
+### Phase 3: A2A Server ✅ Complete
+### Phase 4: ACP Server ✅ Complete
+### Phase 6: Demo UI (Streamlit Dashboard) ✅ Complete
 
 ---
 
@@ -96,17 +99,36 @@ backend/
 │   ├── mcp/            # Phase 2: MCP server ✅
 │   │   ├── mcp_server.py     # MCP protocol implementation
 │   │   └── run_mcp.py        # Server entry point
-│   ├── a2a/            # Phase 3: A2A server (TODO)
-│   ├── acp/            # Phase 4: ACP server (TODO)
-│   └── ui/             # Phase 6: Demo UI (Optional)
-├── tests/              # Unit and integration tests
-│   ├── test_mcp_server.py    # MCP server tests ✅
-│   └── ...                   # Phase 1 tests ✅
-├── demos/              # Demo scenarios
-│   └── mcp_demo.py           # MCP client demo ✅
-├── scripts/            # Interactive testing scripts
-│   ├── test_phase1.py        # Phase 1 interactive test ✅
-│   ├── test_phase2.py        # Phase 2 interactive test ✅
+│   ├── a2a/            # Phase 3: A2A server ✅
+│   │   ├── a2a_server.py     # A2A protocol implementation
+│   │   └── run_a2a.py        # Server entry point
+│   ├── acp/            # Phase 4: ACP server ✅
+│   │   ├── acp_server.py     # ACP protocol implementation
+│   │   ├── intent_parser.py  # Natural language parsing
+│   │   ├── session_manager.py # Session tracking
+│   │   └── run_acp.py        # Server entry point
+│   └── ui/             # Phase 6: Demo UI ✅
+│       ├── dashboard.py      # Streamlit dashboard
+│       ├── run_dashboard.py  # Dashboard entry point
+│       └── README.md         # Dashboard documentation
+├── tests/              # Unit and integration tests ✅
+│   ├── test_mcp_server.py    # MCP server tests
+│   ├── test_a2a_server.py    # A2A server tests
+│   ├── test_acp_server.py    # ACP server tests
+│   └── ...                   # Core component tests
+├── demos/              # Demo scenarios ✅
+│   ├── mcp_demo.py           # MCP client demo
+│   ├── a2a_demo.py           # A2A client demo
+│   └── acp_demo.py           # ACP client demo
+├── scripts/            # Interactive testing and server scripts ✅
+│   ├── test_phase1.py        # Phase 1 interactive test
+│   ├── test_phase2.py        # Phase 2 interactive test
+│   ├── test_phase3.py        # Phase 3 interactive test
+│   ├── test_phase4.py        # Phase 4 interactive test
+│   ├── mcp_server.sh         # MCP server startup script
+│   ├── a2a_server.sh         # A2A server startup script
+│   ├── acp_server.sh         # ACP server startup script
+│   ├── run_dashboard.sh      # Dashboard startup script
 │   └── README.md             # Testing guide
 ├── config/             # Configuration files
 ├── pyproject.toml      # Poetry dependencies and configuration
@@ -667,6 +689,114 @@ print(f"Username: {creds['credentials']['username']}")
 - ✅ No plaintext credential storage
 - ✅ stdio transport for MCP (secure process communication)
 
+## Phase 6: Demo UI ✅
+
+### Streamlit Dashboard (`src/ui/`)
+
+A comprehensive real-time dashboard for monitoring and testing all three protocols (MCP, A2A, ACP).
+
+#### Features
+
+- **Real-Time Metrics**
+  - Active tokens count with expiration tracking
+  - Total requests across all protocols
+  - Success rate calculations
+  - Dashboard uptime monitoring
+
+- **Protocol Usage Visualization**
+  - Bar charts comparing MCP, A2A, and ACP request volumes
+  - Protocol breakdown with percentages
+  - Interactive filtering and display
+
+- **Interactive Protocol Testing**
+  - MCP: Direct credential manager integration
+  - A2A: Agent card discovery and task execution
+  - ACP: Natural language credential requests
+  - Form-based input with validation
+
+- **Active Token Display**
+  - Real-time token expiration countdown
+  - Token metadata (protocol, resource, agent, TTL)
+  - Full JWT display with copy functionality
+  - Automatic cleanup of expired tokens
+
+- **Audit Event Stream**
+  - Live audit log display
+  - Filter by protocol and outcome
+  - CSV export for compliance
+  - Configurable event limits
+
+#### Running the Dashboard
+
+**Method 1: Using the Shell Script (Recommended)**
+```bash
+cd backend
+./scripts/run_dashboard.sh
+```
+
+**Method 2: Using Python**
+```bash
+cd backend
+python -m src.ui.run_dashboard
+```
+
+**Method 3: Using Streamlit Directly**
+```bash
+cd backend
+streamlit run src/ui/dashboard.py
+```
+
+**Access**: Dashboard will be available at http://localhost:8501
+
+#### Prerequisites
+
+Install UI dependencies:
+```bash
+cd backend
+poetry install --extras ui
+```
+
+This installs:
+- `streamlit>=1.38.0`
+- `pandas>=2.2.0`
+
+#### Configuration
+
+Ensure your `.env` file includes:
+```env
+# Required for MCP testing (direct)
+OP_CONNECT_HOST=http://localhost:8080
+OP_CONNECT_TOKEN=your-connect-token
+OP_VAULT_ID=your-vault-id
+JWT_SECRET_KEY=your-secret-key
+
+# Required for A2A testing (via HTTP)
+A2A_SERVER_URL=http://localhost:8000
+A2A_BEARER_TOKEN=dev-token-change-in-production
+
+# Required for ACP testing (via HTTP)
+ACP_SERVER_URL=http://localhost:8001
+ACP_BEARER_TOKEN=dev-token-change-in-production
+```
+
+For full dashboard functionality, start backend servers:
+```bash
+# Terminal 1 - A2A Server
+python src/a2a/run_a2a.py
+
+# Terminal 2 - ACP Server
+python src/acp/run_acp.py
+
+# Terminal 3 - Dashboard
+./scripts/run_dashboard.sh
+```
+
+**Note**: MCP testing works directly through the credential manager without requiring a running MCP server.
+
+See `src/ui/README.md` for detailed dashboard documentation.
+
+---
+
 ## Test Coverage
 
 Current test coverage: **76%**
@@ -690,12 +820,14 @@ make test-cov      # With coverage report
 
 - ✅ **Phase 1**: Core foundation (COMPLETE)
 - ✅ **Phase 2**: MCP server (COMPLETE)
-- ⏭️ **Phase 3**: A2A server implementation
-- ⏭️ **Phase 4**: ACP server implementation
+- ✅ **Phase 3**: A2A server (COMPLETE)
+- ✅ **Phase 4**: ACP server (COMPLETE)
 - ⏭️ **Phase 5**: Docker integration and orchestration
-- ⏭️ **Phase 6**: Demo UI (optional)
+- ✅ **Phase 6**: Demo UI (COMPLETE)
 - ⏭️ **Phase 7**: Documentation and testing
 - ⏭️ **Phase 8**: Final validation
+
+**Current Progress**: 5/8 phases complete (62.5%)
 
 ## Development
 

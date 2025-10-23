@@ -1,0 +1,45 @@
+# Dockerfile for MCP Server
+# Universal 1Password Credential Broker - MCP Component
+
+FROM python:3.12-slim
+
+# Set working directory
+WORKDIR /app
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy dependency files
+COPY pyproject.toml poetry.lock* ./
+
+# Install Poetry
+RUN pip install poetry==1.8.0
+
+# Configure Poetry to not create virtual environment (we're in a container)
+RUN poetry config virtualenvs.create false
+
+# Install dependencies
+RUN poetry install --no-interaction --no-ansi --no-root
+
+# Copy application code
+COPY src/ ./src/
+COPY __init__.py ./
+
+# Create necessary directories
+RUN mkdir -p /app/logs /app/data
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD python -c "import sys; from src.core.credential_manager import CredentialManager; cm = CredentialManager(); sys.exit(0 if cm.health_check()['status'] == 'healthy' else 1)"
+
+# Run MCP server
+CMD ["python", "src/mcp/run_mcp.py"]
+

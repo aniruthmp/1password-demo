@@ -9,6 +9,7 @@ from typing import Any
 
 from .onepassword_client import OnePasswordClient
 from .token_manager import TokenManager
+from .metrics import get_metrics_collector
 
 logger = logging.getLogger(__name__)
 
@@ -163,6 +164,10 @@ class CredentialManager:
                 "expires_at": payload.get("exp"),
                 "ttl_minutes": ttl,
             }
+
+            # Record token generation in metrics
+            metrics = get_metrics_collector()
+            metrics.record_token_generation(ttl)
 
             logger.info(
                 f"Successfully issued token for {agent_id} "

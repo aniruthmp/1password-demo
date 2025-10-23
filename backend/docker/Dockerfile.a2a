@@ -1,0 +1,49 @@
+# Dockerfile for A2A Server
+# Universal 1Password Credential Broker - A2A Component
+
+FROM python:3.12-slim
+
+# Set working directory
+WORKDIR /app
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy dependency files
+COPY pyproject.toml poetry.lock* ./
+
+# Install Poetry
+RUN pip install poetry==1.8.0
+
+# Configure Poetry to not create virtual environment
+RUN poetry config virtualenvs.create false
+
+# Install dependencies
+RUN poetry install --no-interaction --no-ansi --no-root
+
+# Copy application code
+COPY src/ ./src/
+COPY __init__.py ./
+
+# Create necessary directories
+RUN mkdir -p /app/logs /app/data
+
+# Expose port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Run A2A server
+CMD ["python", "src/a2a/run_a2a.py"]
+

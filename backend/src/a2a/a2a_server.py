@@ -25,12 +25,11 @@ from pydantic import BaseModel, Field
 
 from ..core.credential_manager import CredentialManager, ResourceType
 from ..core.audit_logger import AuditLogger
+from ..core.metrics import get_metrics_collector, MetricsTimer
+from ..core.logging_config import configure_logging
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
+# Configure centralized logging
+configure_logging()
 logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
@@ -547,6 +546,17 @@ async def execute_task(
         Task execution response with credentials or error
     """
     start_time = time.time()
+    resource_type = "unknown"
+
+    # Determine resource type from capability name
+    if "database" in request.capability_name:
+        resource_type = "database"
+    elif "api" in request.capability_name:
+        resource_type = "api"
+    elif "ssh" in request.capability_name:
+        resource_type = "ssh"
+    else:
+        resource_type = "generic"
 
     logger.info(
         f"Task execution requested: task_id={request.task_id}, "
@@ -567,6 +577,10 @@ async def execute_task(
 
         execution_time = (time.time() - start_time) * 1000  # Convert to ms
 
+        # Record success metrics
+        metrics = get_metrics_collector()
+        metrics.record_request("a2a", resource_type, True, execution_time)
+
         logger.info(
             f"Task completed successfully: task_id={request.task_id}, "
             f"execution_time={execution_time:.2f}ms"
@@ -581,6 +595,11 @@ async def execute_task(
 
     except ValueError as e:
         execution_time = (time.time() - start_time) * 1000
+        
+        # Record failure metrics
+        metrics = get_metrics_collector()
+        metrics.record_request("a2a", resource_type, False, execution_time)
+        
         logger.error(f"Task failed (validation error): task_id={request.task_id}, error={e}")
 
         # Log failed attempt
@@ -705,16 +724,20 @@ async def get_status():
     Get server status and metrics.
 
     Returns:
-        Server status with basic metrics
+        Server status with comprehensive metrics
     """
+    metrics = get_metrics_collector()
+    metrics_data = metrics.get_metrics_dict()
+    
     return {
         "service": "a2a-server",
         "version": "1.0.0",
+        "protocol": "A2A",
         "agent_card": {
             "agent_id": AGENT_CARD.agent_id,
             "capabilities_count": len(AGENT_CARD.capabilities),
         },
-        "uptime": "N/A",  # Would track in production
+        **metrics_data,
     }
 
 

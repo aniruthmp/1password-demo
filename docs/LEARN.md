@@ -1,1197 +1,1127 @@
-# Universal 1Password Agent Credential Broker - Learning Guide
+# Universal 1Password Agent Credential Broker - Interview Prep Guide
 
-**Interview Preparation Material**  
 **Project:** Multi-Protocol Credential Broker (MCP + A2A + ACP)  
 **Phases Completed:** Phase 1 (Foundation), Phase 2 (MCP Server), Phase 3 (A2A Server)  
 **Last Updated:** January 2025
 
 ---
 
-## 🎯 Project Overview
+## 🎯 Executive Summary
 
-This project implements a **Universal Credential Broker** that enables AI agents and applications to securely retrieve ephemeral credentials from 1Password vaults through multiple communication protocols. The system provides **just-in-time credential provisioning** with automatic expiration, comprehensive audit logging, and multi-protocol support.
+This project implements a **Universal Credential Broker** that provides just-in-time ephemeral credentials to AI agents through three modern protocols: **MCP** (Model Context Protocol), **A2A** (Agent-to-Agent), and **ACP** (Agent Client Protocol).
 
-### Key Value Propositions
-- **Zero Standing Privilege**: Credentials are ephemeral (5-minute default TTL)
-- **Multi-Protocol Support**: Single broker, three protocols (MCP, A2A, ACP)
-- **Security-First Design**: AES-256 encryption, JWT tokens, audit logging
-- **Ecosystem Integration**: Compatible with CrewAI, LangChain, Claude, and more
+**The Core Problem We Solve:**
+- AI agents need credentials to access databases, APIs, and services
+- Traditional credential management creates security risks (stolen keys, over-privileged access)
+- We provide **zero standing privilege** through ephemeral tokens that expire automatically
 
----
-
-## 🏗️ Architecture Overview
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    AI Agent Ecosystem                       │
-├─────────────────────────────────────────────────────────────┤
-│  MCP Clients    │  A2A Agents     │  ACP Frameworks        │
-│  (Claude, etc.) │  (CrewAI, etc.) │  (LangChain, etc.)    │
-└─────────────────┼─────────────────┼─────────────────────────┘
-                  │                 │
-                  ▼                 ▼
-┌─────────────────────────────────────────────────────────────┐
-│              Universal Credential Broker                    │
-├─────────────────────────────────────────────────────────────┤
-│  MCP Server     │  A2A Server     │  ACP Server           │
-│  (stdio)        │  (REST + SSE)   │  (REST + Sessions)    │
-└─────────────────┼─────────────────┼─────────────────────────┘
-                  │                 │
-                  ▼                 ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Core Infrastructure                      │
-├─────────────────────────────────────────────────────────────┤
-│  CredentialManager │ TokenManager │ AuditLogger │ 1Password │
-│  (Orchestration)   │ (JWT + AES)  │ (Events API)│ Connect   │
-└─────────────────────────────────────────────────────────────┘
-                  │
-                  ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    1Password Vault                          │
-│                  + Events API                               │
-└─────────────────────────────────────────────────────────────┘
-```
+**Key Innovation:**
+- Single broker supporting three different agent communication protocols
+- 5-minute default credential lifetime (max 15 minutes)
+- AES-256 encrypted JWT tokens
+- Complete audit trail for compliance
 
 ---
 
-## 📚 Phase 1: Foundation & Core Infrastructure
+## 📖 Interview Q&A: Protocol Fundamentals
 
-### 1.1 Core Components Architecture
+### Understanding the Three Protocols
 
-#### **CredentialManager** (`src/core/credential_manager.py`)
-**Purpose**: Central orchestration layer that coordinates credential retrieval and token generation.
+**Q: Let's start with the basics - what are MCP, A2A, and ACP, and why do we need three different protocols?**
 
-**Key Concepts**:
-- **Resource Type Validation**: Supports `database`, `api`, `ssh`, `generic` resource types
-- **Dependency Injection**: Accepts `OnePasswordClient` and `TokenManager` as dependencies
-- **Error Handling**: Comprehensive validation and error propagation
-- **Health Checks**: Monitors all component health status
+**A:** Great question! Think of these as different "languages" that AI systems speak depending on their use case:
 
-**Key Methods**:
-```python
-# Fetch credentials from 1Password
-def fetch_credentials(self, resource_type: str, resource_name: str, vault_id: str = None) -> dict[str, Any]
+**MCP (Model Context Protocol)** - This is like giving tools to an AI assistant. Imagine Claude or ChatGPT needs to check a database - MCP lets them discover and call tools (like "get_credentials") as if they're built-in functions. It's standardized by Anthropic and uses a simple client-server model over stdio (standard input/output).
 
-# Generate ephemeral JWT token with encrypted credentials
-def issue_ephemeral_token(self, credentials: dict, agent_id: str, resource_type: str, resource_name: str, ttl_minutes: int = None) -> dict[str, Any]
+**A2A (Agent-to-Agent Protocol)** - This is for agents collaborating with each other. Picture one agent that analyzes data needing credentials from a credential agent. A2A uses REST APIs and supports agent discovery through "Agent Cards" - like a business card that says "here's what I can do for you." It's designed for enterprise integration.
 
-# Convenience method: fetch + issue in one call
-def fetch_and_issue_token(self, resource_type: str, resource_name: str, agent_id: str, ttl_minutes: int = None) -> dict[str, Any]
+**ACP (Agent Client Protocol)** - This is specifically for code editors and IDEs working with AI coding agents. Zed built this for their AI assistant to autonomously modify code. It's more conversational and session-based - the agent can ask the client to read files, write code, execute terminal commands.
 
-# Validate token and return metadata (without decrypting)
-def validate_token(self, token: str) -> dict[str, Any]
-
-# Validate token and decrypt embedded credentials
-def get_credentials_from_token(self, token: str) -> dict[str, Any]
-```
-
-**Interview Questions**:
-- How does the CredentialManager ensure type safety for different resource types?
-- What design patterns are used for dependency injection?
-- How would you handle concurrent credential requests?
-
-#### **TokenManager** (`src/core/token_manager.py`)
-**Purpose**: Handles JWT token generation, validation, and AES-256 encryption of credential data.
-
-**Key Concepts**:
-- **JWT Standards**: Implements RFC 7519 JSON Web Token specification
-- **AES-256 Encryption**: Uses Fernet (AES-256 in CBC mode) for credential encryption
-- **Key Derivation**: PBKDF2-HMAC-SHA256 for secure key derivation
-- **Token Lifecycle**: Generation, validation, expiration checking, decryption
-
-**Security Features**:
-```python
-# Key derivation using PBKDF2
-kdf = PBKDF2HMAC(
-    algorithm=hashes.SHA256(),
-    length=32,
-    salt=b"1password-broker-salt",  # Fixed salt for deterministic key
-    iterations=100000,
-)
-
-# JWT payload structure
-payload = {
-    "sub": agent_id,                    # Subject: requesting agent
-    "credentials": encrypted_creds,     # AES-256 encrypted credential data
-    "resource_type": resource_type,     # Type of resource
-    "resource_name": resource_name,     # Resource identifier
-    "iat": now,                         # Issued at
-    "exp": exp,                         # Expiration
-    "iss": "1password-credential-broker", # Issuer
-    "ttl_minutes": ttl,                 # Time-to-live
-}
-```
-
-**Interview Questions**:
-- Why use AES-256 encryption for credentials within JWT tokens?
-- How does PBKDF2 key derivation improve security?
-- What happens if a token expires while in use?
-
-#### **OnePasswordClient** (`src/core/onepassword_client.py`)
-**Purpose**: Async client for 1Password Connect API integration.
-
-**Key Concepts**:
-- **Async Operations**: All API calls are asynchronous for better performance
-- **Error Handling**: Comprehensive error handling for network issues, rate limits
-- **Health Checks**: Connection validation and status monitoring
-- **Field Extraction**: Intelligent credential field extraction from 1Password items
-
-**API Integration**:
-```python
-# Async client initialization
-async_client = new_client(
-    host=connect_host,
-    token=connect_token,
-    is_async=True
-)
-
-# Vault and item operations
-vaults = await client.get_vaults()
-item = await client.get_item(item_id, vault_id)
-item_by_title = await client.get_item_by_title(title, vault_id)
-```
-
-**Interview Questions**:
-- How does async/await improve performance in credential retrieval?
-- What strategies are used for handling 1Password API rate limits?
-- How would you implement retry logic for failed API calls?
-
-#### **AuditLogger** (`src/core/audit_logger.py`)
-**Purpose**: Comprehensive audit logging with 1Password Events API integration.
-
-**Key Concepts**:
-- **Events API Integration**: Posts events to 1Password Events API
-- **Retry Logic**: Exponential backoff for failed event delivery
-- **Local Fallback**: File-based logging when Events API is unavailable
-- **Structured Logging**: JSON-formatted logs for easy parsing
-
-**Audit Trail**:
-```python
-# Log credential access events
-await audit_logger.log_credential_access(
-    protocol="MCP",  # or "A2A", "ACP"
-    agent_id="requesting-agent-id",
-    resource="database/prod-postgres",
-    outcome="success",  # or "failure", "error"
-    metadata={
-        "action": "credential_retrieval",
-        "ttl_minutes": 5,
-        "expires_at": "2025-01-23T12:39:56Z"
-    }
-)
-```
-
-**Interview Questions**:
-- Why is audit logging critical for credential management systems?
-- How does exponential backoff improve reliability?
-- What compliance requirements does structured logging support?
-
-### 1.2 Security Architecture
-
-#### **Zero Standing Privilege Model**
-- **Ephemeral Tokens**: Default 5-minute TTL, maximum 15 minutes
-- **No Persistent Storage**: Credentials are never stored in the broker
-- **Automatic Expiration**: Tokens expire automatically without manual intervention
-- **Encrypted Transport**: All credential data encrypted with AES-256
-
-#### **Authentication & Authorization**
-- **Bearer Token Authentication**: Used in A2A and ACP protocols
-- **Agent Identity**: Each request includes requesting agent ID for audit trails
-- **Resource Validation**: Strict validation of resource types and names
-- **Rate Limiting**: Per-agent rate limiting to prevent abuse
-
-#### **Encryption & Key Management**
-- **AES-256 Encryption**: Industry-standard encryption for credential data
-- **Key Derivation**: PBKDF2-HMAC-SHA256 with 100,000 iterations
-- **JWT Signing**: HMAC-SHA256 for token integrity
-- **Environment Variables**: Secure key storage using environment variables
+**Why three?** Different ecosystems have different needs. CrewAI agents prefer REST APIs (A2A), Claude Desktop uses tools (MCP), and code editors need file system access (ACP). By supporting all three, our broker works everywhere.
 
 ---
 
-## 🔧 Phase 2: MCP Server Implementation
+### Model Context Protocol (MCP) Deep Dive
 
-### 2.1 Model Context Protocol (MCP) Overview
+**Q: Walk me through how MCP actually works. What happens when an AI assistant needs credentials?**
 
-**MCP** is an open protocol that standardizes how applications provide context, data sources, and tools to Large Language Models (LLMs). It enables AI models to interact with external systems through a standardized interface.
+**A:** Let me break down the MCP flow step-by-step:
 
-#### **Key MCP Concepts**:
-- **Tools**: Functions that AI models can call to perform actions
-- **Resources**: Data sources that AI models can read
-- **Prompts**: Pre-defined prompts for common tasks
-- **Transport**: Communication mechanism (stdio, SSE, WebSocket)
+1. **Initialization**: The client (like Claude Desktop) spawns our broker as a subprocess. They exchange a handshake:
+   - Client says: "I support MCP version 2025-06-18, here are my capabilities"
+   - Server responds: "Great! I support tools with dynamic updates"
 
-### 2.2 MCP Server Implementation (`src/mcp/mcp_server.py`)
+2. **Tool Discovery**: The client asks "what tools do you have?" using a JSON-RPC call to `tools/list`. We respond with our `get_credentials` tool definition, including the input schema (resource_type, resource_name, ttl_minutes).
 
-#### **Server Architecture**:
-```python
-# Server initialization with lifespan management
-server = Server("1password-credential-broker", lifespan=server_lifespan)
+3. **Tool Execution**: When the AI decides it needs database credentials:
+   - Client calls: `tools/call` with arguments like `{resource_type: "database", resource_name: "prod-postgres"}`
+   - We fetch credentials from 1Password
+   - Encrypt them with AES-256
+   - Generate a JWT token with 5-minute expiry
+   - Return it to the client
 
-@asynccontextmanager
-async def server_lifespan(_server: Server) -> AsyncIterator[dict[str, Any]]:
-    """Manage server startup and shutdown lifecycle."""
-    # Initialize resources on startup
-    credential_manager = CredentialManager()
-    audit_logger = AuditLogger()
-    
-    try:
-        yield {
-            "credential_manager": credential_manager,
-            "audit_logger": audit_logger,
-        }
-    finally:
-        # Clean up on shutdown
-        logger.info("MCP Server shutting down - cleaning up resources...")
-```
+4. **Communication**: All messages go through stdin/stdout using JSON-RPC 2.0. Errors go to stderr.
 
-#### **Tool Definition**:
-```python
-@server.list_tools()
-async def handle_list_tools() -> list[types.Tool]:
-    """List available tools for credential retrieval."""
-    return [
-        types.Tool(
-            name="get_credentials",
-            description=(
-                "Retrieve ephemeral credentials from 1Password vault. "
-                "Returns a short-lived JWT token (default 5 minutes) containing "
-                "encrypted credentials for the requested resource."
-            ),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "resource_type": {
-                        "type": "string",
-                        "enum": ["database", "api", "ssh", "generic"],
-                        "description": "Type of credential resource to retrieve",
-                    },
-                    "resource_name": {
-                        "type": "string",
-                        "description": "Name/title of the credential item in 1Password vault",
-                    },
-                    "requesting_agent_id": {
-                        "type": "string",
-                        "description": "Unique identifier of the requesting agent",
-                    },
-                    "ttl_minutes": {
-                        "type": "integer",
-                        "description": "Token time-to-live in minutes (default: 5, max: 15)",
-                        "default": 5,
-                        "minimum": 1,
-                        "maximum": 15,
-                    },
-                },
-                "required": ["resource_type", "resource_name", "requesting_agent_id"],
-            },
-        )
-    ]
-```
-
-#### **Tool Execution**:
-```python
-@server.call_tool()
-async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.TextContent]:
-    """Handle tool execution for credential retrieval."""
-    if name != "get_credentials":
-        raise ValueError(f"Unknown tool: {name}")
-    
-    # Access lifespan context
-    ctx = server.request_context
-    credential_manager: CredentialManager = ctx.lifespan_context["credential_manager"]
-    audit_logger: AuditLogger = ctx.lifespan_context["audit_logger"]
-    
-    # Execute credential retrieval logic
-    return await _handle_get_credentials(arguments, credential_manager, audit_logger)
-```
-
-### 2.3 MCP Transport & Communication
-
-#### **STDIO Transport**:
-- **Standard Input/Output**: Uses stdin/stdout for communication
-- **JSON-RPC Protocol**: Structured request/response format
-- **Process Spawning**: MCP clients spawn the server as a subprocess
-- **Bidirectional Communication**: Server can send notifications to clients
-
-#### **Client Integration Example**:
-```python
-# MCP Client connecting to our server
-async with stdio_client(
-    StdioServerParameters(command="python", args=["src/mcp/run_mcp.py"])
-) as (read, write):
-    async with ClientSession(read, write) as session:
-        await session.initialize()
-        
-        # List available tools
-        tools = await session.list_tools()
-        
-        # Call the get_credentials tool
-        result = await session.call_tool("get_credentials", {
-            "resource_type": "database",
-            "resource_name": "prod-postgres",
-            "requesting_agent_id": "claude-assistant",
-            "ttl_minutes": 5
-        })
-```
-
-### 2.4 MCP Demo Implementation (`demos/mcp_demo.py`)
-
-The MCP demo shows how an AI assistant (like Claude) would use our credential broker:
-
-```python
-async def main():
-    """Demonstrate MCP client interaction with credential broker."""
-    async with stdio_client(
-        StdioServerParameters(command="python", args=["src/mcp/run_mcp.py"])
-    ) as (read, write):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            
-            # Simulate AI assistant requesting database credentials
-            result = await session.call_tool("get_credentials", {
-                "resource_type": "database",
-                "resource_name": "prod-postgres",
-                "requesting_agent_id": "claude-assistant",
-                "ttl_minutes": 5
-            })
-            
-            print("Credential retrieval result:")
-            for content in result.content:
-                print(content.text)
-```
-
-**Interview Questions**:
-- How does MCP enable AI models to interact with external systems?
-- What are the benefits of using JSON-RPC for tool communication?
-- How does lifespan management improve resource efficiency?
-- What security considerations apply to MCP tool execution?
+**The beauty of MCP** is that from the AI's perspective, getting credentials looks just like calling any other tool - like a calculator or weather API.
 
 ---
 
-## 🤝 Phase 3: A2A Server Implementation
+**Q: What are the key architectural components of MCP?**
 
-### 3.1 Agent-to-Agent (A2A) Protocol Overview
+**A:** MCP has three main primitives:
 
-**A2A** is a protocol for agent-to-agent communication that enables different AI agents to collaborate and share capabilities. It provides structured discovery, task execution, and streaming capabilities.
+**Tools** - Functions the AI can call. Like our `get_credentials` tool. Each tool has:
+- A name and description
+- An input schema (JSON Schema format)
+- Returns structured content (text, embedded resources, or links)
 
-#### **Key A2A Concepts**:
-- **Agent Cards**: Self-describing capability definitions
-- **Task Execution**: Structured request/response for agent capabilities
-- **Streaming Support**: Server-Sent Events for long-running operations
-- **Authentication**: Bearer token-based authentication
+**Resources** - Data sources the AI can read. Think of these like "here's a file" or "here's a database connection string". Resources have URIs and can be listed/read.
 
-### 3.2 A2A Server Implementation (`src/a2a/a2a_server.py`)
+**Prompts** - Pre-defined prompt templates for common tasks. We haven't implemented these yet, but you could have a prompt like "help me securely connect to a database."
 
-#### **FastAPI Application Setup**:
-```python
-# Initialize FastAPI app
-app = FastAPI(
-    title="1Password A2A Credential Broker",
-    description="Agent-to-Agent credential provisioning service",
-    version="1.0.0",
-)
-
-# Configure CORS for agent-to-agent communication
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-```
-
-#### **Agent Card Definition**:
-```python
-AGENT_CARD = AgentCard(
-    agent_id="1password-credential-broker",
-    name="1Password Ephemeral Credential Agent",
-    description=(
-        "Provides just-in-time ephemeral credentials from 1Password vaults. "
-        "Supports multiple resource types (database, API, SSH, generic) with "
-        "configurable TTL and automatic audit logging."
-    ),
-    version="1.0.0",
-    capabilities=[
-        Capability(
-            name="request_database_credentials",
-            description="Request temporary database credentials with configurable TTL",
-            input_schema=[
-                CapabilityInput(
-                    name="database_name",
-                    type="string",
-                    description="Name of the database resource in 1Password",
-                    required=True,
-                ),
-                CapabilityInput(
-                    name="duration_minutes",
-                    type="integer",
-                    description="Token duration in minutes (1-15, default: 5)",
-                    required=False,
-                ),
-            ],
-            output_schema={
-                "ephemeral_token": "string (JWT)",
-                "expires_in_seconds": "integer",
-                "database": "string",
-                "issued_at": "string (ISO 8601)",
-            },
-        ),
-        # ... additional capabilities for API, SSH, generic credentials
-    ],
-    communication_modes=["text", "json"],
-    authentication="bearer_token",
-)
-```
-
-#### **Discovery Endpoint**:
-```python
-@app.get("/agent-card", response_model=AgentCard)
-async def get_agent_card():
-    """
-    A2A Discovery: Return agent capabilities.
-    
-    Returns:
-        AgentCard with full capability definitions
-    """
-    logger.info("Agent card requested")
-    return AGENT_CARD
-```
-
-#### **Task Execution Endpoint**:
-```python
-@app.post("/task", response_model=A2ATaskResponse)
-async def execute_task(
-    request: A2ATaskRequest,
-    agent_id: str = Depends(verify_bearer_token),
-):
-    """
-    A2A Task Execution: Handle credential requests from other agents.
-    
-    Args:
-        request: Task execution request
-        agent_id: Authenticated agent ID
-        
-    Returns:
-        Task execution response with credentials or error
-    """
-    start_time = time.time()
-    
-    try:
-        # Validate capability
-        if request.capability_name not in CAPABILITY_HANDLERS:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Unknown capability: {request.capability_name}",
-            )
-        
-        # Execute capability handler
-        handler = CAPABILITY_HANDLERS[request.capability_name]
-        result = await handler(request.parameters, request.requesting_agent_id)
-        
-        execution_time = (time.time() - start_time) * 1000
-        
-        return A2ATaskResponse(
-            task_id=request.task_id,
-            status=TaskStatus.COMPLETED,
-            result=result,
-            execution_time_ms=execution_time,
-        )
-        
-    except Exception as e:
-        # Error handling and audit logging
-        return A2ATaskResponse(
-            task_id=request.task_id,
-            status=TaskStatus.FAILED,
-            error=str(e),
-            execution_time_ms=(time.time() - start_time) * 1000,
-        )
-```
-
-### 3.3 Capability Handlers
-
-#### **Database Credentials Handler**:
-```python
-async def handle_database_credentials(
-    parameters: dict[str, Any],
-    requesting_agent_id: str,
-) -> dict[str, Any]:
-    """Handle request_database_credentials capability."""
-    database_name = parameters.get("database_name")
-    duration_minutes = parameters.get("duration_minutes", 5)
-    
-    if not database_name:
-        raise ValueError("database_name is required")
-    
-    # Validate TTL
-    if not isinstance(duration_minutes, int) or duration_minutes < 1 or duration_minutes > 15:
-        raise ValueError("duration_minutes must be between 1 and 15")
-    
-    # Fetch credentials and issue token
-    token_data = get_credential_manager().fetch_and_issue_token(
-        resource_type=ResourceType.DATABASE.value,
-        resource_name=database_name,
-        agent_id=requesting_agent_id,
-        ttl_minutes=duration_minutes,
-    )
-    
-    # Log to audit trail
-    await get_audit_logger().log_credential_access(
-        protocol="A2A",
-        agent_id=requesting_agent_id,
-        resource=f"database/{database_name}",
-        outcome="success",
-    )
-    
-    return {
-        "ephemeral_token": token_data["token"],
-        "expires_in_seconds": token_data["expires_in"],
-        "database": database_name,
-        "issued_at": datetime.now(UTC).isoformat() + "Z",
-    }
-```
-
-### 3.4 Server-Sent Events (SSE) Streaming
-
-#### **Streaming Endpoint**:
-```python
-@app.post("/task/{task_id}/stream")
-async def stream_task_updates(
-    task_id: str,
-    agent_id: str = Depends(verify_bearer_token),
-):
-    """
-    A2A Streaming: Server-Sent Events for long-running credential provisioning.
-    
-    Args:
-        task_id: Task identifier
-        agent_id: Authenticated agent ID
-        
-    Returns:
-        SSE stream with progress updates
-    """
-    async def event_generator():
-        """Generate SSE events for task progress."""
-        try:
-            # Initial status
-            yield f"data: {{'status': 'started', 'task_id': '{task_id}', 'timestamp': '{datetime.now(UTC).isoformat()}Z'}}\n\n"
-            await asyncio.sleep(0.5)
-            
-            # Progress update
-            yield f"data: {{'status': 'provisioning', 'task_id': '{task_id}', 'progress': 50, 'timestamp': '{datetime.now(UTC).isoformat()}Z'}}\n\n"
-            await asyncio.sleep(0.5)
-            
-            # Completion
-            yield f"data: {{'status': 'completed', 'task_id': '{task_id}', 'progress': 100, 'timestamp': '{datetime.now(UTC).isoformat()}Z'}}\n\n"
-            
-        except asyncio.CancelledError:
-            yield f"data: {{'status': 'cancelled', 'task_id': '{task_id}', 'timestamp': '{datetime.now(UTC).isoformat()}Z'}}\n\n"
-        except Exception as e:
-            yield f"data: {{'status': 'error', 'task_id': '{task_id}', 'error': '{str(e)}', 'timestamp': '{datetime.now(UTC).isoformat()}Z'}}\n\n"
-    
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
-```
-
-### 3.5 Authentication & Security
-
-#### **Bearer Token Authentication**:
-```python
-async def verify_bearer_token(authorization: str = Header(None)) -> str:
-    """Verify bearer token authentication."""
-    if not authorization:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing Authorization header",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    try:
-        scheme, token = authorization.split()
-        if scheme.lower() != "bearer":
-            raise ValueError("Invalid authentication scheme")
-        
-        # In production, validate the token properly
-        if token != BEARER_TOKEN:
-            raise ValueError("Invalid token")
-        
-        return "authenticated-agent"
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-```
-
-### 3.6 A2A Demo Implementation (`demos/a2a_demo.py`)
-
-The A2A demo shows how two agents would collaborate:
-
-```python
-async def main():
-    """Demonstrate A2A agent collaboration."""
-    base_url = "http://localhost:8000"
-    headers = {"Authorization": "Bearer dev-token-change-in-production"}
-    
-    # Step 1: Discover agent capabilities
-    async with httpx.AsyncClient() as client:
-        response = await client.get(f"{base_url}/agent-card", headers=headers)
-        agent_card = response.json()
-        
-        print(f"Discovered agent: {agent_card['name']}")
-        print(f"Capabilities: {len(agent_card['capabilities'])}")
-        
-        # Step 2: Request database credentials
-        task_request = {
-            "task_id": str(uuid4()),
-            "capability_name": "request_database_credentials",
-            "parameters": {
-                "database_name": "prod-postgres",
-                "duration_minutes": 5
-            },
-            "requesting_agent_id": "data-analysis-agent"
-        }
-        
-        response = await client.post(f"{base_url}/task", json=task_request, headers=headers)
-        task_response = response.json()
-        
-        if task_response["status"] == "completed":
-            print("✅ Credentials retrieved successfully!")
-            print(f"Token: {task_response['result']['ephemeral_token'][:20]}...")
-            print(f"Expires in: {task_response['result']['expires_in_seconds']} seconds")
-        else:
-            print(f"❌ Task failed: {task_response['error']}")
-```
-
-**Interview Questions**:
-- How does A2A enable agent-to-agent collaboration?
-- What are the benefits of using Agent Cards for capability discovery?
-- How does Server-Sent Events improve user experience for long-running operations?
-- What security considerations apply to A2A authentication?
+**Transports** - How messages are sent:
+- **stdio**: For desktop apps (what we use)
+- **HTTP with SSE**: For web-based clients
+- **WebSocket**: For bidirectional real-time communication
 
 ---
 
-## 🔐 Security Deep Dive
+**Q: How does MCP handle dynamic updates? What if new tools become available?**
 
-### 4.1 Encryption & Key Management
+**A:** That's where the `listChanged` capability comes in. When a server's tools change:
 
-#### **AES-256 Encryption Implementation**:
-```python
-def _initialize_fernet(self, key: str) -> Fernet:
-    """Initialize Fernet cipher for AES-256 encryption."""
-    # Derive a proper 32-byte key using PBKDF2
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=b"1password-broker-salt",  # Fixed salt for deterministic key
-        iterations=100000,
-    )
-    derived_key = base64.urlsafe_b64encode(kdf.derive(key.encode()))
-    return Fernet(derived_key)
+1. Server sends a notification: `tools/list_changed` (no response expected)
+2. Client receives notification and requests fresh tool list: `tools/list`
+3. Server responds with updated tools
+4. Client updates its internal registry
 
-def encrypt_payload(self, data: dict[str, Any]) -> str:
-    """Encrypt credential data using AES-256."""
-    # Convert dict to JSON string
-    json_data = json.dumps(data)
-    
-    # Encrypt using Fernet (AES-256 in CBC mode)
-    encrypted_bytes = self.fernet.encrypt(json_data.encode())
-    
-    # Return as base64 string
-    return encrypted_bytes.decode()
-```
-
-#### **JWT Token Structure**:
-```python
-payload = {
-    "sub": agent_id,                    # Subject: requesting agent
-    "credentials": encrypted_creds,     # AES-256 encrypted credential data
-    "resource_type": resource_type,     # Type of resource
-    "resource_name": resource_name,     # Resource identifier
-    "iat": now,                         # Issued at (timestamp)
-    "exp": exp,                         # Expiration (timestamp)
-    "iss": "1password-credential-broker", # Issuer
-    "ttl_minutes": ttl,                 # Time-to-live in minutes
-}
-```
-
-### 4.2 Zero Standing Privilege Model
-
-#### **Ephemeral Token Lifecycle**:
-1. **Request**: Agent requests credentials for specific resource
-2. **Retrieval**: System fetches credentials from 1Password
-3. **Encryption**: Credentials encrypted with AES-256
-4. **Token Generation**: JWT created with encrypted credentials
-5. **Delivery**: Token delivered to requesting agent
-6. **Usage**: Agent uses token to access resource
-7. **Expiration**: Token automatically expires (default 5 minutes)
-8. **Cleanup**: No persistent storage of credentials
-
-#### **Security Benefits**:
-- **No Persistent Storage**: Credentials never stored in broker
-- **Automatic Expiration**: Tokens expire without manual intervention
-- **Encrypted Transport**: All credential data encrypted in transit
-- **Audit Trail**: Complete logging of all credential access
-
-### 4.3 Audit Logging & Compliance
-
-#### **Structured Audit Events**:
-```python
-await audit_logger.log_credential_access(
-    protocol="MCP",  # Protocol used (MCP, A2A, ACP)
-    agent_id="requesting-agent-id",
-    resource="database/prod-postgres",
-    outcome="success",  # success, failure, error
-    metadata={
-        "action": "credential_retrieval",
-        "ttl_minutes": 5,
-        "expires_at": "2025-01-23T12:39:56Z",
-        "request_timestamp": "2025-01-23T12:34:56Z"
-    }
-)
-```
-
-#### **Compliance Features**:
-- **Complete Audit Trail**: Every credential access logged
-- **Structured Logging**: JSON format for easy parsing
-- **Retry Logic**: Exponential backoff for failed event delivery
-- **Local Fallback**: File-based logging when Events API unavailable
-- **Timestamp Tracking**: Precise timing for all operations
+This is crucial for production systems where capabilities might be added/removed dynamically based on user permissions or system state.
 
 ---
 
-## 🚀 Technology Stack Deep Dive
+### Agent-to-Agent (A2A) Protocol Deep Dive
 
-### 5.1 FastAPI Framework
+**Q: How is A2A different from MCP in practice?**
 
-#### **Why FastAPI?**
-- **High Performance**: One of the fastest Python web frameworks
-- **Type Safety**: Built-in Pydantic validation and type hints
-- **Automatic Documentation**: OpenAPI/Swagger documentation generation
-- **Async Support**: Native async/await support for better performance
-- **Dependency Injection**: Built-in DI system for clean architecture
+**A:** A2A is designed for **agent-to-agent collaboration** rather than AI-to-tool interaction. Key differences:
 
-#### **Key FastAPI Features Used**:
-```python
-# Automatic request/response validation
-@app.post("/task", response_model=A2ATaskResponse)
-async def execute_task(request: A2ATaskRequest):
-    # FastAPI automatically validates request against A2ATaskRequest model
-    # and serializes response using A2ATaskResponse model
-    pass
+**Architecture:**
+- A2A uses standard HTTP/REST instead of stdio
+- Supports Server-Sent Events (SSE) for streaming long-running tasks
+- Built for enterprise environments (uses bearer tokens, CORS, standard security practices)
 
-# Dependency injection for authentication
-async def execute_task(
-    request: A2ATaskRequest,
-    agent_id: str = Depends(verify_bearer_token),  # DI for auth
-):
-    pass
+**Discovery:**
+- Instead of tool lists, A2A uses **Agent Cards** - JSON documents that describe:
+  - Agent identity (name, version, description)
+  - Capabilities (what tasks it can perform)
+  - Input/output schemas for each capability
+  - Communication modes (text, JSON, protobuf)
+  - Authentication requirements
 
-# CORS middleware for cross-origin requests
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-```
+**Task Execution:**
+- Client posts a task request with:
+  - Task ID (for tracking)
+  - Capability name (e.g., "request_database_credentials")
+  - Parameters (e.g., database_name, duration_minutes)
+  - Requesting agent ID
+- Server responds with task status (completed/failed/in-progress)
 
-### 5.2 1Password Connect SDK
-
-#### **Integration Patterns**:
-```python
-# Async client initialization
-async_client = new_client(
-    host=connect_host,
-    token=connect_token,
-    is_async=True
-)
-
-# Vault operations
-vaults = await client.get_vaults()
-vault = await client.get_vault(vault_id)
-
-# Item operations
-items = await client.get_items(vault_id)
-item = await client.get_item(item_id, vault_id)
-item_by_title = await client.get_item_by_title(title, vault_id)
-
-# Field extraction
-credentials = client.extract_credential_fields(item)
-```
-
-#### **Error Handling**:
-```python
-try:
-    item = await client.get_item_by_title(resource_name, vault_id)
-    if not item:
-        raise ValueError(f"Resource '{resource_name}' not found in 1Password vault")
-    
-    credentials = client.extract_credential_fields(item)
-    return credentials
-    
-except Exception as e:
-    logger.error(f"Failed to fetch credentials for {resource_name}: {e}")
-    raise
-```
-
-### 5.3 JWT & Cryptography Libraries
-
-#### **python-jose for JWT**:
-```python
-import jwt
-from jose import JWTError
-
-# Token generation
-token = jwt.encode(payload, secret_key, algorithm="HS256")
-
-# Token verification
-try:
-    payload = jwt.decode(token, secret_key, algorithms=["HS256"])
-except JWTError as e:
-    logger.error(f"Invalid JWT token: {e}")
-    raise
-```
-
-#### **cryptography for AES-256**:
-```python
-from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-
-# Key derivation
-kdf = PBKDF2HMAC(
-    algorithm=hashes.SHA256(),
-    length=32,
-    salt=b"1password-broker-salt",
-    iterations=100000,
-)
-derived_key = base64.urlsafe_b64encode(kdf.derive(key.encode()))
-fernet = Fernet(derived_key)
-
-# Encryption/Decryption
-encrypted_data = fernet.encrypt(json_data.encode())
-decrypted_data = fernet.decrypt(encrypted_data)
-```
+**Real-world example:**
+A data analysis agent needs to query a production database:
+1. It discovers our credential agent via the `/agent-card` endpoint
+2. Sees we have a `request_database_credentials` capability
+3. Posts a task request with the database name
+4. Receives an ephemeral token in the response
+5. Uses that token to authenticate to the database
+6. Token expires automatically after 5 minutes
 
 ---
 
-## 📊 Performance & Scalability
+**Q: Tell me about A2A's streaming capabilities. Why would you need that for credential provisioning?**
 
-### 6.1 Async/Await Architecture
+**A:** Great question! While credential provisioning is typically fast, streaming makes sense for several reasons:
 
-#### **Benefits of Async Operations**:
-- **Non-blocking I/O**: Multiple operations can run concurrently
-- **Better Resource Utilization**: CPU not blocked waiting for I/O
-- **Scalability**: Handle more concurrent requests with same resources
-- **Responsiveness**: System remains responsive during I/O operations
+**Use Cases:**
+- **Progress Updates**: "Connecting to 1Password... Validating vault access... Fetching credentials... Encrypting..."
+- **Long-Running Operations**: If we need to provision credentials for multiple resources in one request
+- **Human-in-the-Loop**: "Waiting for admin approval for production database access..."
 
-#### **Async Implementation Examples**:
-```python
-# Async credential retrieval
-async def fetch_credentials(self, resource_type: str, resource_name: str) -> dict[str, Any]:
-    # Non-blocking 1Password API call
-    item = await self.op_client.get_item_by_title(resource_name, vault_id)
-    
-    # Non-blocking credential extraction
-    credentials = self.op_client.extract_credential_fields(item)
-    
-    return credentials
+**How it works:**
+- Client subscribes to `/task/{task_id}/stream`
+- Server sends Server-Sent Events (SSE) with updates
+- Each event has: status, progress percentage, timestamp
+- Client can close the stream anytime
+- Final event indicates completion or error
 
-# Async audit logging
-async def log_credential_access(self, protocol: str, agent_id: str, resource: str, outcome: str):
-    # Non-blocking event posting
-    await self._post_event_to_api(event_data)
+**Example flow:**
+```
+data: {"status": "started", "task_id": "abc-123", "progress": 0}
+data: {"status": "provisioning", "task_id": "abc-123", "progress": 50}
+data: {"status": "completed", "task_id": "abc-123", "progress": 100, "result": {...}}
 ```
 
-### 6.2 Performance Optimizations
-
-#### **Connection Pooling**:
-- **HTTP Client Reuse**: Reuse HTTP connections for 1Password API calls
-- **Connection Limits**: Configure appropriate connection pool sizes
-- **Keep-Alive**: Maintain persistent connections when possible
-
-#### **Caching Strategies**:
-- **Health Check Caching**: Cache health check results for short periods
-- **Vault Metadata**: Cache vault information that doesn't change frequently
-- **Token Validation**: Cache token validation results for valid tokens
-
-#### **Resource Management**:
-- **Lifespan Management**: Proper startup/shutdown of resources
-- **Memory Management**: Efficient handling of credential data
-- **Connection Cleanup**: Proper cleanup of network connections
+This provides **better UX** for agent systems that have visual interfaces or need to coordinate multiple sub-agents.
 
 ---
 
-## 🧪 Testing Strategy
+**Q: What does the Agent Card actually contain? Why is it important?**
 
-### 7.1 Unit Testing
+**A:** The Agent Card is essentially a **self-describing API contract**. Ours includes:
 
-#### **Test Coverage Areas**:
-- **CredentialManager**: Test credential retrieval and token generation
-- **TokenManager**: Test JWT generation, validation, and encryption
-- **OnePasswordClient**: Test API integration and error handling
-- **AuditLogger**: Test event logging and retry logic
+**Identity:**
+- `agent_id`: "1password-credential-broker"
+- `name`: "1Password Ephemeral Credential Agent"
+- `version`: "1.0.0"
 
-#### **Example Unit Test**:
-```python
-def test_credential_manager_fetch_and_issue_token():
-    """Test complete credential flow."""
-    # Arrange
-    credential_manager = CredentialManager()
-    resource_type = "database"
-    resource_name = "test-db"
-    agent_id = "test-agent"
-    
-    # Act
-    result = credential_manager.fetch_and_issue_token(
-        resource_type=resource_type,
-        resource_name=resource_name,
-        agent_id=agent_id,
-        ttl_minutes=5
-    )
-    
-    # Assert
-    assert result["token"] is not None
-    assert result["expires_in"] == 300  # 5 minutes in seconds
-    assert result["resource"] == f"{resource_type}/{resource_name}"
-    assert result["ttl_minutes"] == 5
-```
+**Capabilities** (we define 4):
+- `request_database_credentials`
+- `request_api_credentials`
+- `request_ssh_credentials`
+- `request_generic_credentials`
 
-### 7.2 Integration Testing
+Each capability specifies:
+- Input schema: what parameters are required/optional
+- Output schema: what you'll get back
+- Descriptions for AI understanding
 
-#### **End-to-End Testing**:
-- **MCP Protocol**: Test complete MCP client-server interaction
-- **A2A Protocol**: Test agent discovery and task execution
-- **1Password Integration**: Test real 1Password API calls
-- **Audit Logging**: Test Events API integration
+**Why it matters:**
+- **Discovery**: Agents can automatically find and understand what we offer
+- **Validation**: Client and server agree on contracts upfront
+- **Documentation**: Self-documenting API
+- **Versioning**: Clients can check compatibility before attempting tasks
 
-#### **Example Integration Test**:
-```python
-async def test_mcp_end_to_end():
-    """Test complete MCP credential flow."""
-    async with stdio_client(
-        StdioServerParameters(command="python", args=["src/mcp/run_mcp.py"])
-    ) as (read, write):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            
-            # Test tool listing
-            tools = await session.list_tools()
-            assert len(tools) == 1
-            assert tools[0].name == "get_credentials"
-            
-            # Test credential retrieval
-            result = await session.call_tool("get_credentials", {
-                "resource_type": "database",
-                "resource_name": "test-db",
-                "requesting_agent_id": "test-agent",
-                "ttl_minutes": 5
-            })
-            
-            assert len(result.content) == 1
-            assert "Ephemeral credentials generated successfully" in result.content[0].text
-```
-
-### 7.3 Security Testing
-
-#### **Security Test Cases**:
-- **Token Expiration**: Verify tokens expire after TTL
-- **Encryption Validation**: Verify credential encryption/decryption
-- **Authentication**: Test bearer token validation
-- **Input Validation**: Test malformed request handling
-- **Rate Limiting**: Test rate limit enforcement
+It's like OpenAPI/Swagger but designed specifically for agent-to-agent communication.
 
 ---
 
-## 🎯 Interview Preparation Questions
+### Agent Client Protocol (ACP) Deep Dive
 
-### 8.1 Architecture & Design Questions
+**Q: ACP seems different from the other two. What's its primary use case?**
 
-**Q: How would you scale this system to handle thousands of concurrent credential requests?**
+**A:** Exactly! ACP is purpose-built for **code editor + AI coding agent** scenarios. Zed (the code editor company) created this protocol.
 
-**A: Key scaling strategies:**
-- **Horizontal Scaling**: Deploy multiple broker instances behind a load balancer
-- **Connection Pooling**: Implement connection pooling for 1Password API calls
-- **Caching**: Cache vault metadata and health check results
-- **Async Processing**: Use async/await for non-blocking I/O operations
-- **Database**: Consider Redis for session management and rate limiting
-- **Monitoring**: Implement comprehensive monitoring and alerting
+**The Core Problem:**
+Traditional AI coding assistants (like Copilot) can only suggest code. But what if you want an agent that can:
+- Read multiple files to understand context
+- Make edits across multiple files
+- Run tests to verify changes
+- Execute terminal commands
+- All autonomously?
 
-**Q: How would you handle 1Password API rate limits?**
+ACP enables this by giving the agent controlled access to:
+- **File system**: read/write files in the workspace
+- **Terminal**: create sessions, run commands, get output
+- **Sessions**: maintain conversation context across multiple interactions
 
-**A: Rate limit handling strategies:**
-- **Exponential Backoff**: Implement retry logic with exponential backoff
-- **Circuit Breaker**: Use circuit breaker pattern to prevent cascade failures
-- **Request Queuing**: Queue requests when rate limits are hit
-- **Caching**: Cache frequently accessed credentials (with appropriate TTL)
-- **Monitoring**: Track API usage and implement alerts for rate limit approaches
+**Our Implementation:**
+While we haven't built the full ACP server yet (that's Phase 4), when we do, it will support:
+- Natural language credential requests: "Get me the production database credentials"
+- Session management: remembering which credentials you've requested
+- Intent recognition: understanding what resource you need even from vague descriptions
+- Multi-turn conversations: "Actually, I need the staging database instead"
+
+---
+
+**Q: How does ACP handle authentication and sessions differently than A2A?**
+
+**A:** Great comparison question!
+
+**A2A Authentication:**
+- Stateless bearer token authentication
+- Every request includes `Authorization: Bearer <token>`
+- No session management - each request is independent
+- Token validates the agent's identity
+
+**ACP Authentication:**
+- Happens during initialization phase (`/authenticate` endpoint)
+- Supports multiple auth methods (API keys, OAuth, custom)
+- **Session-based**: after auth, you get a session ID
+- All subsequent requests tied to that session
+- Session maintains conversation context, user preferences, credential history
+
+**Why the difference?**
+- A2A: Designed for microservices/enterprise where stateless is preferred
+- ACP: Designed for long-running IDE sessions where context matters
+
+**Example ACP flow:**
+1. Initialize: negotiate versions and capabilities
+2. Authenticate: prove you're an authorized agent
+3. Create Session: start a new conversation
+4. Multiple Prompts: "get postgres creds", "now get redis creds", "what did I just request?"
+5. Session retains context throughout
+
+---
+
+## 🔒 Security Architecture Q&A
+
+**Q: Walk me through the "zero standing privilege" model. How does it actually work?**
+
+**A:** Zero standing privilege means credentials have **no persistent existence** outside their use window.
+
+**Traditional Approach (Bad):**
+- Credentials stored in environment variables or config files
+- They sit there forever until manually rotated
+- If compromised, attacker has unlimited time to use them
+- Hard to audit who accessed what
+
+**Our Approach:**
+1. **Just-in-Time**: Credentials only retrieved when requested
+2. **Ephemeral**: Default 5-minute lifetime, max 15 minutes
+3. **Encrypted**: Wrapped in AES-256 encrypted JWT
+4. **Automatic Expiration**: Token expires without human intervention
+5. **No Storage**: We never persist credentials - they live in memory only during processing
+
+**Example:**
+- 9:00 AM: Agent requests database credentials
+- 9:00 AM: We fetch from 1Password, encrypt, issue token
+- 9:05 AM: Token expires automatically
+- If agent needs credentials again at 9:06 AM, must request fresh token
+
+**Impact:**
+- Attack window: 5 minutes instead of forever
+- Audit trail: every access logged with timestamp, agent ID, resource
+- Compliance: meets regulatory requirements for credential rotation
+
+---
+
+**Q: Why encrypt credentials inside the JWT if JWT is already signed?**
+
+**A:** Excellent security question! JWT signature and encryption serve different purposes:
+
+**JWT Signature (HMAC-SHA256):**
+- Proves **integrity**: token hasn't been tampered with
+- Proves **authenticity**: token came from us
+- Does NOT hide the payload - JWT is base64 encoded, easily decoded
+
+**AES-256 Encryption (Fernet):**
+- Provides **confidentiality**: actual passwords/keys are hidden
+- Even if someone intercepts the token, they can't read the credentials
+- Requires the encryption key to decrypt
+
+**Defense in Depth:**
+If an attacker gets the JWT:
+- With signature only: they can read the plaintext credentials
+- With encryption: they see encrypted gibberish, unusable without the key
+
+**In practice:**
+- JWT travels over network (could be logged, cached, etc.)
+- We don't want credentials exposed even in encrypted channels
+- Encryption key is separate from JWT signing key (different secrets)
+
+---
+
+**Q: How do you prevent credential leakage through logs?**
+
+**A:** This is critical for compliance! We have several safeguards:
+
+**1. Structured Logging:**
+- Never log actual credential values (passwords, API keys)
+- Only log metadata (resource name, agent ID, timestamp)
+- Use separate audit logs vs application logs
+
+**2. Field Filtering:**
+```python
+# We log this (safe):
+{"agent_id": "data-agent", "resource": "database/prod-postgres", "outcome": "success"}
+
+# NEVER log this:
+{"password": "secret123", "username": "admin"}
+```
+
+**3. Audit Separation:**
+- Application logs: help debug issues
+- Audit logs: compliance trail, goes to 1Password Events API
+- Different retention policies and access controls
+
+**4. Token Representation:**
+- In logs, we show only first 20 characters: `eyJhbGciOiJIUzI1NiIs...`
+- Enough for debugging, not enough to use
+
+**5. Error Handling:**
+- Generic error messages to clients
+- Detailed errors only in secure logs
+- Never include credentials in exception messages
+
+---
 
 **Q: What happens if the 1Password Connect server goes down?**
 
-**A: Resilience strategies:**
-- **Health Checks**: Implement health checks to detect service outages
-- **Graceful Degradation**: Return appropriate error messages to clients
-- **Retry Logic**: Implement retry logic with exponential backoff
-- **Fallback Logging**: Use local file logging when Events API is unavailable
-- **Monitoring**: Alert on service outages and implement recovery procedures
+**A:** We have multiple layers of resilience:
 
-### 8.2 Security Questions
+**Health Check System:**
+- Periodic health checks to 1Password Connect API
+- Track availability status
+- Expose health endpoint for monitoring
 
-**Q: How do you ensure credentials are never stored persistently?**
+**Graceful Degradation:**
+```
+If 1Password unavailable:
+  → Return clear error to client: "Credential service temporarily unavailable"
+  → Log the outage for ops team
+  → Don't crash or hang indefinitely
+```
 
-**A: Zero standing privilege implementation:**
-- **Ephemeral Tokens**: All tokens have short TTL (5 minutes default)
-- **No Database Storage**: Credentials never stored in database
-- **Memory-Only Processing**: Credentials only exist in memory during processing
-- **Automatic Expiration**: Tokens expire automatically without manual intervention
-- **Audit Trail**: Complete logging of all credential access for compliance
+**Retry Logic:**
+- Exponential backoff for transient failures
+- Max 3 retries with delays: 1s, 2s, 4s
+- If all retries fail, report to client
 
-**Q: How do you prevent credential leakage in logs?**
+**Fallback for Audit Logging:**
+- Primary: 1Password Events API
+- Fallback: Local file logging
+- Queue events for retry when API recovers
 
-**A: Logging security measures:**
-- **Structured Logging**: Use structured JSON logging with sensitive field exclusion
-- **Field Filtering**: Never log actual credential values, only metadata
-- **Log Levels**: Use appropriate log levels to control sensitive information
-- **Audit Separation**: Separate audit logs from application logs
-- **Encryption**: Encrypt audit logs if stored persistently
+**Circuit Breaker (Future Enhancement):**
+- After N consecutive failures, "open circuit"
+- Stop making requests for cooldown period
+- Prevents cascade failures and thundering herd
 
-**Q: How do you handle JWT token security?**
-
-**A: JWT security measures:**
-- **Strong Signing**: Use HMAC-SHA256 with strong secret keys
-- **Short TTL**: Default 5-minute expiration, maximum 15 minutes
-- **Encrypted Payload**: AES-256 encrypt credential data within JWT
-- **Key Derivation**: Use PBKDF2-HMAC-SHA256 for key derivation
-- **Token Validation**: Comprehensive validation including expiration and signature
-
-### 8.3 Protocol Questions
-
-**Q: Why did you choose to implement multiple protocols (MCP, A2A, ACP)?**
-
-**A: Multi-protocol benefits:**
-- **Ecosystem Compatibility**: Different AI frameworks use different protocols
-- **Use Case Optimization**: Each protocol optimized for specific use cases
-- **Future-Proofing**: Support emerging protocols as they develop
-- **Market Coverage**: Broader market coverage with single implementation
-- **Protocol Evolution**: Can evolve protocols independently
-
-**Q: How does MCP differ from A2A in terms of use cases?**
-
-**A: Protocol differences:**
-- **MCP**: AI model calls credential retrieval as a "tool" (e.g., Claude plugin)
-- **A2A**: Two agents collaborate and share credentials (e.g., data agent requests from credential agent)
-- **ACP**: Framework needs REST API with session context (e.g., CrewAI agent making structured requests)
-- **Transport**: MCP uses stdio, A2A uses HTTP/SSE, ACP uses HTTP with sessions
-- **Discovery**: MCP uses tool listing, A2A uses agent cards, ACP uses agent listing
-
-### 8.4 Implementation Questions
-
-**Q: How do you handle errors and failures gracefully?**
-
-**A: Error handling strategies:**
-- **Comprehensive Error Handling**: Try-catch blocks around all external calls
-- **Structured Error Responses**: Consistent error response format across protocols
-- **Audit Logging**: Log all errors for debugging and compliance
-- **Graceful Degradation**: Return meaningful error messages to clients
-- **Retry Logic**: Implement retry logic for transient failures
-- **Health Checks**: Monitor system health and report degraded states
-
-**Q: How do you ensure the system is maintainable and extensible?**
-
-**A: Maintainability strategies:**
-- **Clean Architecture**: Separation of concerns with clear interfaces
-- **Dependency Injection**: Loose coupling through DI
-- **Type Safety**: Use type hints and Pydantic models throughout
-- **Comprehensive Testing**: Unit, integration, and security tests
-- **Documentation**: Clear documentation and code comments
-- **Modular Design**: Easy to add new protocols or capabilities
+**Monitoring & Alerting:**
+- Track error rates, response times
+- Alert ops when health degrades
+- Runbooks for incident response
 
 ---
 
-## 🚀 Future Enhancements & Roadmap
+## 🛠️ Implementation & Architecture Q&A
 
-### 9.1 Phase 4: ACP Server Implementation
-- **Natural Language Processing**: Parse natural language credential requests
-- **Session Management**: Maintain conversation context across requests
-- **Intent Recognition**: Understand user intent from unstructured input
-- **Multi-turn Conversations**: Support complex credential workflows
+**Q: Walk me through your system architecture. What are the main components?**
 
-### 9.2 Phase 5: Integration & Orchestration
-- **Docker Compose**: Containerized deployment with all services
-- **Unified Logging**: Centralized logging and monitoring
-- **Health Endpoints**: Comprehensive health checks for all components
-- **Metrics Collection**: Performance and usage metrics
+**A:** We have a **layered architecture** with clear separation of concerns:
 
-### 9.3 Phase 6: Demo UI (Optional)
-- **Streamlit Dashboard**: Real-time metrics and protocol visualization
-- **Interactive Testing**: Test all protocols through web interface
-- **Audit Event Stream**: Live audit log visualization
-- **Token Management**: View and manage active tokens
+**Layer 1: Protocol Servers (Interface Layer)**
+- MCP Server (stdio transport)
+- A2A Server (HTTP/REST + SSE)
+- ACP Server (HTTP/REST + sessions) - planned Phase 4
 
-### 9.4 Advanced Features
-- **Multi-Vault Support**: Support for multiple 1Password vaults
-- **Role-Based Access**: Fine-grained access control
-- **Token Revocation**: Manual token revocation capability
-- **Confidential Computing**: Hardware-based attestation
-- **Horizontal Scaling**: Multi-instance deployment support
+Each server translates protocol-specific requests into core operations.
 
----
+**Layer 2: Core Infrastructure (Business Logic)**
+- **CredentialManager**: Orchestrates the entire flow
+  - Validates resource types
+  - Coordinates between OnePasswordClient and TokenManager
+  - Health checks
+  
+- **TokenManager**: Handles cryptography
+  - Generates JWT tokens
+  - AES-256 encryption/decryption
+  - Key derivation (PBKDF2)
+  - Token validation
+  
+- **OnePasswordClient**: Integrates with 1Password
+  - Async API calls
+  - Vault and item operations
+  - Field extraction
+  - Error handling
+  
+- **AuditLogger**: Compliance trail
+  - Posts events to 1Password Events API
+  - Local fallback logging
+  - Retry logic
 
-## 📚 Key Takeaways for Interviews
+**Layer 3: External Services**
+- 1Password Connect API
+- 1Password Events API
+- Vault storage
 
-### 10.1 Technical Highlights
-- **Multi-Protocol Architecture**: Single broker supporting MCP, A2A, and ACP
-- **Zero Standing Privilege**: Ephemeral tokens with automatic expiration
-- **Security-First Design**: AES-256 encryption, JWT tokens, comprehensive audit logging
-- **Async/Await Architecture**: High-performance non-blocking I/O operations
-- **Clean Architecture**: Separation of concerns with dependency injection
-
-### 10.2 Business Value
-- **Ecosystem Integration**: Compatible with major AI frameworks and tools
-- **Compliance Ready**: Complete audit trail for regulatory compliance
-- **Developer Experience**: Easy integration with existing AI workflows
-- **Scalable Design**: Built to handle enterprise-scale credential requests
-- **Future-Proof**: Extensible architecture for emerging protocols
-
-### 10.3 Security Benefits
-- **Reduced Attack Surface**: No persistent credential storage
-- **Automatic Expiration**: Tokens expire without manual intervention
-- **Encrypted Transport**: All credential data encrypted in transit
-- **Audit Compliance**: Complete logging for security and compliance
-- **Zero Trust Model**: Every request authenticated and authorized
+**Key Design Decisions:**
+- **Dependency Injection**: Core components accept dependencies (testable, flexible)
+- **Async/Await**: All I/O operations non-blocking
+- **Protocol Agnostic Core**: Same core logic serves all three protocols
+- **Type Safety**: Pydantic models everywhere
 
 ---
 
-## 🎓 Learning Resources
+**Q: Why did you choose FastAPI for the A2A server?**
 
-### 11.1 Official Documentation
+**A:** FastAPI was the obvious choice for several reasons:
+
+**1. Performance:**
+- One of the fastest Python frameworks
+- Built on Starlette (async) and Pydantic (validation)
+- Handles concurrent requests efficiently
+
+**2. Type Safety:**
+- Native type hints and validation
+- Pydantic models prevent invalid requests at the edge
+- Reduces runtime errors
+
+**3. Automatic Documentation:**
+- OpenAPI/Swagger docs generated automatically
+- Interactive API testing UI
+- Matches A2A's self-describing philosophy
+
+**4. Async Native:**
+- First-class async/await support
+- Perfect for I/O-bound operations (1Password API calls)
+- Non-blocking request handling
+
+**5. Developer Experience:**
+- Dependency injection built-in (used for auth)
+- Easy middleware support (CORS)
+- Excellent error handling
+
+**Example:**
+```python
+@app.post("/task", response_model=A2ATaskResponse)
+async def execute_task(
+    request: A2ATaskRequest,  # Auto-validates
+    agent_id: str = Depends(verify_bearer_token),  # DI for auth
+):
+    # FastAPI handles validation, auth, serialization automatically
+```
+
+---
+
+**Q: How does async/await improve your system's performance?**
+
+**A:** Async/await is crucial for our I/O-bound workload:
+
+**The Problem:**
+Credential provisioning involves:
+1. Network call to 1Password API (50-200ms)
+2. Cryptographic operations (10-50ms)
+3. Audit log posting (20-100ms)
+
+With synchronous code, thread blocks during each I/O operation. With 100 concurrent requests, you'd need 100 threads.
+
+**Async Solution:**
+- While waiting for 1Password API, event loop handles other requests
+- Single thread can manage hundreds of concurrent operations
+- Better CPU utilization, less memory overhead
+
+**Real Impact:**
+```
+Synchronous: 10 requests/second (blocked on I/O)
+Async: 100+ requests/second (event loop multiplexing)
+```
+
+**Where We Use Async:**
+- All 1Password API calls: `await client.get_item(...)`
+- Audit logging: `await audit_logger.log_credential_access(...)`
+- Server-Sent Events: `async def event_generator()`
+- Request handlers: `async def execute_task(...)`
+
+**When NOT to Use:**
+- CPU-intensive operations (encryption) - but they're fast enough
+- Database transactions with complex locking (we don't have a DB)
+
+---
+
+**Q: How would you scale this system to handle thousands of concurrent requests?**
+
+**A:** Great question! Several strategies:
+
+**Horizontal Scaling:**
+- Deploy multiple broker instances
+- Put them behind a load balancer (Nginx, AWS ALB)
+- Stateless design makes this easy (no session affinity needed)
+
+**Connection Pooling:**
+- Reuse HTTP connections to 1Password API
+- Configure pool size based on API rate limits
+- Avoid connection overhead
+
+**Caching:**
+- Cache vault metadata (rarely changes)
+- Cache health check results (30-60 seconds)
+- Consider credential caching with TTL (risky, evaluate security impact)
+
+**Rate Limiting:**
+- Per-agent rate limits (prevent abuse)
+- Token bucket or sliding window algorithms
+- Return 429 Too Many Requests when exceeded
+
+**Async Workers:**
+- Separate audit logging into background queue
+- Don't block credential delivery on audit success
+- Use Celery or Redis Queue
+
+**Monitoring & Metrics:**
+- Track: requests/second, latency, error rate, token expiration rate
+- Use Prometheus + Grafana
+- Auto-scale based on metrics
+
+**Database (If Needed):**
+- Currently we're stateless (great!)
+- If we add rate limiting or session management, use Redis
+- Fast in-memory storage for temporary state
+
+---
+
+**Q: Tell me about your testing strategy. How do you ensure reliability?**
+
+**A:** We have a comprehensive testing pyramid:
+
+**Unit Tests:**
+- Test each component in isolation
+- Mock external dependencies (1Password API)
+- Focus on business logic correctness
+- Example: token generation, encryption, validation
+
+**Integration Tests:**
+- Test protocol servers end-to-end
+- Use real MCP/A2A clients
+- Verify complete flows work correctly
+- Example: MCP client requests credentials, receives valid token
+
+**Security Tests:**
+- Token expiration enforcement
+- Invalid token rejection
+- Encryption/decryption correctness
+- Auth bypass attempts
+
+**Phase Testing:**
+- **Phase 1**: Core infrastructure unit tests
+- **Phase 2**: MCP server integration tests
+- **Phase 3**: A2A server integration tests
+- **Phase 4**: ACP server integration tests
+
+**Test Coverage:**
+- Aim for >80% code coverage
+- Critical paths (credential flow) at 100%
+- Use pytest with coverage reporting
+
+**Manual Testing:**
+- Demo scripts for each protocol
+- Health check validation
+- Production-like environment testing
+
+---
+
+## 🎤 Scenario-Based Interview Questions
+
+**Q: An agent is requesting credentials but getting "resource not found" errors. How would you debug this?**
+
+**A:** I'd follow a systematic debugging approach:
+
+**1. Verify the Request:**
+- Check what `resource_type` and `resource_name` were provided
+- Confirm they match what's actually in 1Password
+- Common mistake: typo in resource name or wrong vault
+
+**2. Check 1Password Integration:**
+- Is 1Password Connect server healthy? Call health endpoint
+- Can we list vaults? Try `GET /vaults`
+- Does the item actually exist? Search manually in 1Password
+
+**3. Review Audit Logs:**
+- What does the audit trail show? "failure" or "error"?
+- Check application logs for detailed error messages
+- Look for patterns (all requests failing vs specific resource)
+
+**4. Validate Permissions:**
+- Does the Connect token have access to that vault?
+- Are there vault-level permissions blocking access?
+
+**5. Test Manually:**
+- Use our demo script with the same resource name
+- Try with a known-good resource (like "test-db")
+- Isolate whether it's this resource or all resources
+
+**6. Return Helpful Error:**
+- Give the agent actionable info: "Resource 'prod-postgres' not found in vault 'Production'. Available resources: ..."
+- Don't expose sensitive vault structure to unauthorized agents
+
+---
+
+**Q: You notice the average credential retrieval time has increased from 200ms to 2 seconds. What do you investigate?**
+
+**A:** Performance degradation - let's troubleshoot:
+
+**1. Identify the Bottleneck:**
+- Add timing metrics to each operation:
+  - 1Password API call time
+  - Encryption time
+  - Audit logging time
+  - Network latency
+- Pinpoint which component slowed down
+
+**2. Check 1Password API:**
+- Are we hitting rate limits? Check response headers
+- Is Connect server under load? Check its health
+- Network issues? Test latency directly: `curl 1password-host`
+
+**3. Review System Resources:**
+- CPU usage on broker host
+- Memory pressure
+- Network bandwidth
+- Open file descriptors (connection leaks?)
+
+**4. Examine Recent Changes:**
+- Did we deploy new code?
+- Did 1Password Connect update?
+- Configuration changes?
+- Increased request volume?
+
+**5. Check Concurrent Load:**
+- How many requests are in flight?
+- Are we overwhelming a single-threaded component?
+- Connection pool exhausted?
+
+**6. Audit Logging Issues:**
+- Is Events API slow or timing out?
+- Are we retrying failed audit posts (exponential backoff)?
+- Consider async audit logging (don't block credential delivery)
+
+**Quick Win:**
+- Add caching for vault metadata
+- Increase connection pool size
+- Implement request queuing if overloaded
+
+---
+
+**Q: A security audit reveals that a token was used 30 minutes after issuance, even though TTL is 5 minutes. How is this possible? How do you fix it?**
+
+**A:** This is a critical security issue! Let's investigate:
+
+**Possible Causes:**
+
+**1. Clock Skew:**
+- Client and server have different system times
+- JWT expiration checks use timestamps
+- If client clock is 25 minutes behind, token appears valid
+
+**Fix:**
+- Validate token expiration server-side (never trust client)
+- Consider adding a "not before" (`nbf`) claim
+- Monitor system clock synchronization (NTP)
+
+**2. Token Validation Bug:**
+- Are we checking expiration correctly?
+- Review code: `if token.exp < current_time`
+- Check timezone handling (UTC vs local time)
+
+**Fix:**
+- Add unit test specifically for expired tokens
+- Use python-jose's built-in expiration checking
+- Log a warning when expired tokens are attempted
+
+**3. Cached Token:**
+- Client cached the token and keeps reusing it
+- Our validation happens on first use only?
+
+**Fix:**
+- Document that tokens must be validated on every use
+- Consider adding a token revocation list (complexity++)
+
+**4. Token Reuse:**
+- Different agent copied the token
+- Shared credentials between agents
+
+**Fix:**
+- Add agent identity binding
+- Log warnings on suspicious reuse patterns
+- Consider one-time-use tokens (adds complexity)
+
+**Immediate Action:**
+- Review all token validation code
+- Add test case for this exact scenario
+- Check audit logs for other instances
+- Consider temporary TTL reduction (5 → 2 minutes)
+
+---
+
+**Q: An agent team wants to cache credentials for 1 hour to reduce API calls. How do you respond?**
+
+**A:** This requires a thoughtful, security-first response:
+
+**My Response:**
+"I understand the performance concern, but credential caching fundamentally undermines our zero standing privilege model. Let's explore why and discuss alternatives."
+
+**Why It's Problematic:**
+
+**1. Security Risk:**
+- Credentials persisting for 1 hour = 12x larger attack window
+- If agent is compromised, attacker has credentials for an hour
+- Defeats the purpose of ephemeral credentials
+
+**2. Compliance Issues:**
+- Audit trail becomes misleading (one access logged, many uses)
+- Harder to prove credential access patterns
+- May violate regulatory requirements
+
+**3. Credential Rotation:**
+- If credentials are rotated in 1Password, cached version is stale
+- Creates operational headaches
+
+**Alternative Solutions:**
+
+**1. Increase Our TTL (Carefully):**
+- Current: 5 minutes default
+- Propose: 15 minutes for specific, justified use cases
+- Require explicit approval and documentation
+
+**2. Optimize Request Path:**
+- Add connection pooling if not already present
+- Cache vault metadata (not credentials)
+- Reduce round trips
+
+**3. Batch Requests:**
+- If agent needs multiple resources, fetch all at once
+- Reduce total request count
+
+**4. Long-Lived Sessions (A2A/ACP):**
+- Session lasts hours, but tokens refreshed automatically
+- Transparent to the agent
+- Maintains 5-minute credential lifecycle
+
+**5. Performance Metrics:**
+- Measure actual impact: is 200ms really a bottleneck?
+- Often the database query takes 10x longer than credential fetch
+
+**Compromise:**
+- Pilot with 15-minute TTL for their use case
+- Monitor security metrics
+- Review after 30 days
+
+---
+
+## 🚀 Future & Best Practices Q&A
+
+**Q: What would Phase 4 (ACP Server) implementation involve?**
+
+**A:** Phase 4 is the most complex because ACP requires natural language understanding:
+
+**Key Components:**
+
+**1. Session Management:**
+- Create/load/persist conversation sessions
+- Track: conversation history, requested credentials, agent preferences
+- Session timeout and cleanup
+
+**2. Natural Language Processing:**
+- Parse requests like: "I need database credentials for the prod environment"
+- Extract: resource_type=database, environment=prod
+- Handle ambiguity: "Which database? We have prod-postgres, prod-mysql"
+
+**3. Intent Recognition:**
+- Map user intent to capabilities
+- "connect to postgres" → `request_database_credentials`
+- "access the API" → `request_api_credentials`
+
+**4. Multi-Turn Conversations:**
+```
+Agent: "Get me database credentials"
+Server: "Which database? Production or staging?"
+Agent: "Production"
+Server: "Here's your token: ..."
+```
+
+**5. Context Management:**
+- Remember what was discussed earlier in session
+- "Give me those again" → knows which credentials
+- "Switch to staging" → understands context switch
+
+**6. File System Integration (Optional):**
+- If ACP includes fs capabilities
+- Write credentials to .env file securely
+- Clean up after session ends
+
+**Technical Approach:**
+- Use LLM (like Claude API) for intent extraction
+- Structured prompt engineering
+- Fallback to explicit commands if NLP fails
+- Maintain session state in Redis
+
+---
+
+**Q: How would you add support for credential rotation in this system?**
+
+**A:** Credential rotation adds significant complexity. Here's how I'd approach it:
+
+**Current State:**
+- We fetch credentials on-demand from 1Password
+- If credentials rotate in 1Password, next request gets new ones
+- Automatic rotation support (to an extent)
+
+**Enhanced Rotation:**
+
+**1. Rotation Notifications:**
+- Subscribe to 1Password Events API
+- Listen for "credential updated" events
+- Notify active token holders (if we track them)
+
+**2. Token Revocation:**
+- Maintain a revocation list (Redis)
+- When credentials rotate, mark old tokens invalid
+- Validate against revocation list on every use
+
+**3. Grace Period:**
+- During rotation, both old and new credentials valid
+- Prevents disruption to active operations
+- Window: 5-10 minutes
+
+**4. Active Token Tracking:**
+- Store issued tokens (hashed) with expiration
+- On rotation, identify affected agents
+- Send "reauth required" notification
+
+**5. Agent Notification Protocol:**
+- Add webhook support to A2A
+- POST to agent's callback URL: `{event: "credentials_rotated", resource: "database/prod-postgres"}`
+- Agent requests fresh token
+
+**Implementation Steps:**
+1. Add token storage (Redis, with TTL)
+2. Subscribe to 1Password Events
+3. Implement revocation checks
+4. Add webhook delivery
+5. Update agent SDKs with rotation handling
+
+**Trade-offs:**
+- Adds state (no longer fully stateless)
+- More complex error handling
+- But: better security and smoother rotation experience
+
+---
+
+**Q: What monitoring and observability would you add for production?**
+
+**A:** Comprehensive monitoring is critical for production. Here's my approach:
+
+**Metrics to Track:**
+
+**1. Request Metrics:**
+- Requests per second (by protocol)
+- Success rate (% successful)
+- Latency percentiles (p50, p95, p99)
+- Error rate by error type
+
+**2. Token Metrics:**
+- Tokens issued per minute
+- Token validation attempts
+- Expired token attempts (security concern!)
+- Average token lifetime used (vs granted)
+
+**3. Resource Metrics:**
+- Most requested resources
+- Failed resource lookups
+- Credential fetch times by resource
+
+**4. Security Metrics:**
+- Failed authentication attempts
+- Invalid token usage patterns
+- Multiple agents using same token
+- After-hours access anomalies
+
+**5. System Health:**
+- 1Password API availability
+- Events API availability
+- Request queue depth
+- Memory/CPU usage
+
+**Implementation:**
+
+**Prometheus Metrics:**
+```python
+credential_requests_total = Counter('credential_requests_total', 'Total credential requests', ['protocol', 'resource_type'])
+credential_request_duration = Histogram('credential_request_duration_seconds', 'Request duration')
+token_validation_failures = Counter('token_validation_failures_total', 'Failed token validations', ['reason'])
+```
+
+**Grafana Dashboards:**
+- Overview: RPS, error rate, latency
+- Security: failed auths, suspicious activity
+- Resources: top requested, performance by resource
+- Alerts: error rate >5%, latency >1s, 1Password down
+
+**Alerting Rules:**
+- Error rate >5% for 5 minutes → page on-call
+- 1Password unavailable → immediate alert
+- Expired token attempts spike → security investigation
+- Memory usage >80% → warning
+
+**Logging:**
+- Structured JSON logs
+- Include: trace_id, agent_id, resource, duration, outcome
+- Ship to Elasticsearch or CloudWatch
+- Retention: 90 days audit logs, 30 days application logs
+
+**Tracing:**
+- Distributed tracing with OpenTelemetry
+- Trace request through: protocol server → core → 1Password → audit
+- Identify slow components visually
+
+---
+
+**Q: How would you design a disaster recovery plan for this system?**
+
+**A:** DR is crucial for credential infrastructure. Here's my plan:
+
+**Failure Scenarios:**
+
+**1. Broker Failure:**
+- **Impact**: Agents can't get new credentials
+- **Mitigation**: 
+  - Deploy multiple broker instances (multi-AZ)
+  - Health check + auto-restart
+  - RTO: < 5 minutes (auto-scaling)
+  - RPO: 0 (stateless)
+
+**2. 1Password Connect Failure:**
+- **Impact**: Can't fetch credentials from vault
+- **Mitigation**:
+  - Deploy Connect server in HA mode
+  - Fallback to secondary Connect instance
+  - Cache frequently-used credentials (with security review)
+  - RTO: < 2 minutes (automatic failover)
+
+**3. 1Password Events API Failure:**
+- **Impact**: Audit events not delivered
+- **Mitigation**:
+  - Already have local file fallback
+  - Queue events in Redis
+  - Replay when API recovers
+  - RPO: 0 (no audit loss)
+
+**4. Complete Region Failure:**
+- **Impact**: All services down
+- **Mitigation**:
+  - Deploy in multiple regions
+  - Global load balancer
+  - RTO: < 30 minutes (DNS failover)
+
+**5. Data Loss (if we add state):**
+- **Impact**: Lost session data, token revocation list
+- **Mitigation**:
+  - Redis persistence enabled
+  - Regular backups
+  - Multi-replica deployment
+
+**DR Procedures:**
+
+**Runbooks:**
+1. Broker not responding → check health, restart, check logs
+2. 1Password unreachable → verify Connect server, check network, failover
+3. High error rate → check recent deployments, roll back if needed
+4. Security incident → revoke all tokens, rotate keys, audit logs
+
+**Testing:**
+- Monthly DR drills
+- Chaos engineering (randomly kill instances)
+- Load testing (2x expected peak)
+
+**Recovery Steps:**
+1. Detect failure (monitoring alerts)
+2. Automatic failover (load balancer)
+3. Manual intervention if needed
+4. Root cause analysis post-incident
+
+---
+
+## 📚 Key Takeaways for Interview
+
+### What Makes This Project Impressive
+
+**1. Protocol Expertise:**
+- Deep understanding of three emerging agent protocols
+- Can explain trade-offs and use cases for each
+- Implemented real, working servers (not just research)
+
+**2. Security-First Mindset:**
+- Zero standing privilege model
+- Defense in depth (encryption + signing)
+- Comprehensive audit logging
+- Thinks about attack vectors
+
+**3. Production-Ready Thinking:**
+- Error handling and graceful degradation
+- Monitoring and observability
+- Scalability considerations
+- Testing strategy
+
+**4. Modern Architecture:**
+- Async/await for performance
+- Dependency injection for testability
+- Type safety with Pydantic
+- Clean separation of concerns
+
+**5. Business Value:**
+- Solves real problem (credential management for AI agents)
+- Compliance-ready (audit trail)
+- Ecosystem integration (works with CrewAI, Claude, etc.)
+- Extensible design
+
+---
+
+### How to Present This Project
+
+**Elevator Pitch (30 seconds):**
+"I built a universal credential broker that provides ephemeral, just-in-time credentials to AI agents. It supports three different agent communication protocols - MCP, A2A, and ACP - so it works with any AI framework. Credentials expire after 5 minutes, are AES-256 encrypted, and every access is audited. It's basically zero-trust security for AI agents."
+
+**Technical Deep Dive (2 minutes):**
+"The architecture has three layers: protocol servers that speak MCP, A2A, and ACP; a core infrastructure layer that handles 1Password integration, token generation, and audit logging; and external integrations with 1Password's Connect and Events APIs. The system is fully async for performance, uses JWT with embedded AES-256 encrypted credentials, and implements zero standing privilege - credentials have a 5-minute lifetime by default. I chose to support three protocols because different AI ecosystems have different needs: MCP for AI assistants like Claude, A2A for agent-to-agent collaboration, and ACP for code editor integration."
+
+**Results/Impact:**
+- Reduces credential exposure window from days/months to 5 minutes
+- Provides complete audit trail for compliance
+- Enables secure AI agent operations in production environments
+- Supports emerging agent ecosystems (MCP, CrewAI, Claude)
+
+---
+
+### Questions to Ask Interviewer
+
+**About Their AI Strategy:**
+- How are you currently managing credentials for AI/ML systems?
+- What agent frameworks or AI tools are you using or evaluating?
+- How do you handle compliance and audit requirements for AI access?
+
+**About Their Tech Stack:**
+- What protocols do you see emerging in the agent ecosystem?
+- How do you approach security for automated systems?
+- What's your strategy for zero-trust implementation?
+
+**About the Role:**
+- What AI/agent initiatives is the team working on?
+- How does this role contribute to your agent platform?
+- What's the balance between greenfield development and integration work?
+
+---
+
+### Common Follow-Up Questions
+
+**"Why not use environment variables?"**
+Environment variables persist indefinitely, can leak through logs/errors, are hard to rotate, and lack audit trail. Ephemeral tokens solve all these issues.
+
+**"Isn't 5 minutes too short for real workloads?"**
+Most operations complete in seconds. For longer operations, agents can request fresh tokens. We support up to 15 minutes for justified use cases. The risk of compromise grows exponentially with TTL.
+
+**"How does this compare to HashiCorp Vault?"**
+Vault is a general secret manager. We're specialized for AI agent workflows with protocol support (MCP/A2A/ACP), shorter-lived credentials, and agent-specific audit trails. We could actually integrate Vault as a backend instead of 1Password.
+
+**"What if multiple agents need the same credentials?"**
+Each agent gets their own token (with own expiry and audit trail). If they truly need shared access, we can issue multiple tokens for the same resource - still individually auditable.
+
+**"How would you monetize this as a product?"**
+- SaaS: $0.10 per 1000 credential requests
+- Self-hosted: enterprise license ($50k/year)
+- Value prop: reduce security incidents (worth millions)
+- Compliance certification (SOC2, HIPAA)
+
+---
+
+## 🎓 Additional Resources
+
+### Protocol Specifications
 - **Model Context Protocol**: https://modelcontextprotocol.io
-- **1Password Connect API**: https://developer.1password.com/docs/connect
-- **FastAPI Documentation**: https://fastapi.tiangolo.com
-- **Python JWT**: https://python-jose.readthedocs.io
+- **Agent-to-Agent Protocol**: https://a2a-protocol.org
+- **Agent Client Protocol**: https://github.com/zed-industries/agent-client-protocol
 
-### 11.2 Security Resources
-- **JWT Best Practices**: https://tools.ietf.org/html/rfc7519
-- **AES Encryption**: https://tools.ietf.org/html/rfc3602
-- **OAuth 2.0**: https://tools.ietf.org/html/rfc6749
-- **Zero Trust Security**: https://www.nist.gov/publications/zero-trust-architecture
+### Security Standards
+- **JWT (RFC 7519)**: https://tools.ietf.org/html/rfc7519
+- **Zero Trust Architecture**: https://www.nist.gov/publications/zero-trust-architecture
+- **NIST Secrets Management**: https://csrc.nist.gov/publications
 
-### 11.3 AI/ML Resources
-- **Agent Communication Protocols**: https://agentcommunicationprotocol.dev
-- **CrewAI Framework**: https://docs.crewai.com
-- **LangChain**: https://python.langchain.com
-- **Claude API**: https://docs.anthropic.com
+### AI Agent Frameworks
+- **CrewAI**: Multi-agent orchestration (uses A2A)
+- **LangChain**: LLM application framework
+- **Claude API**: Anthropic's AI assistant (supports MCP)
+- **AutoGPT**: Autonomous agent framework
 
 ---
 
-**This learning guide covers all the key concepts, implementations, and interview preparation material for the Universal 1Password Agent Credential Broker project. Use this as your comprehensive reference for understanding the system architecture, security model, and technical implementation details.**
+**Remember:** This project demonstrates both technical depth and practical problem-solving. Focus on explaining *why* you made decisions, not just *what* you built. Be ready to discuss trade-offs, alternative approaches, and real-world implications.
+
+**Good luck with your interview! 🚀**

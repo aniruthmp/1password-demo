@@ -1,24 +1,104 @@
-services:
-  connect-api:
-    image: 1password/connect-api:latest
-    ports:
-      - "8080:8080"
-    volumes:
-      - ./1password-credentials.json:/home/opuser/.op/1password-credentials.json
-      - connect-data:/home/opuser/.op/data
-    environment:
-      - OP_SESSION=/home/opuser/.op/1password-credentials.json
-      - OP_HTTP_PORT=8080
-      - OP_LOG_LEVEL=info
+version: '3.8'
 
-  connect-sync:
-    image: 1password/connect-sync:latest
-    volumes:
-      - ./1password-credentials.json:/home/opuser/.op/1password-credentials.json
-      - connect-data:/home/opuser/.op/data
+services:
+  # A2A Server - Agent-to-Agent Communication
+  a2a-server:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.a2a
+    container_name: 1password-a2a-server
+    ports:
+      - "8000:8000"
     environment:
-      - OP_SESSION=/home/opuser/.op/1password-credentials.json
-      - OP_LOG_LEVEL=info
+      - OP_CONNECT_HOST=${OP_CONNECT_HOST}
+      - OP_CONNECT_TOKEN=${OP_CONNECT_TOKEN}
+      - OP_VAULT_ID=${OP_VAULT_ID}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - TOKEN_TTL_MINUTES=${TOKEN_TTL_MINUTES:-5}
+      - EVENTS_API_URL=${EVENTS_API_URL}
+      - EVENTS_API_TOKEN=${EVENTS_API_TOKEN}
+      - BEARER_TOKEN=${BEARER_TOKEN:-dev-token-change-in-production}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+    networks:
+      - credential-broker-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ACP Server - Agent Communication Protocol
+  acp-server:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.acp
+    container_name: 1password-acp-server
+    ports:
+      - "8001:8001"
+    environment:
+      - OP_CONNECT_HOST=${OP_CONNECT_HOST}
+      - OP_CONNECT_TOKEN=${OP_CONNECT_TOKEN}
+      - OP_VAULT_ID=${OP_VAULT_ID}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - TOKEN_TTL_MINUTES=${TOKEN_TTL_MINUTES:-5}
+      - EVENTS_API_URL=${EVENTS_API_URL}
+      - EVENTS_API_TOKEN=${EVENTS_API_TOKEN}
+      - BEARER_TOKEN=${BEARER_TOKEN:-dev-token-change-in-production}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+    networks:
+      - credential-broker-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # MCP Server - Model Context Protocol (stdio-based, for local testing)
+  # Note: MCP typically runs via stdio and is not exposed as a network service
+  # This is included for completeness but may not be used in production deployment
+  mcp-server:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.mcp
+    container_name: 1password-mcp-server
+    environment:
+      - OP_CONNECT_HOST=${OP_CONNECT_HOST}
+      - OP_CONNECT_TOKEN=${OP_CONNECT_TOKEN}
+      - OP_VAULT_ID=${OP_VAULT_ID}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - TOKEN_TTL_MINUTES=${TOKEN_TTL_MINUTES:-5}
+      - EVENTS_API_URL=${EVENTS_API_URL}
+      - EVENTS_API_TOKEN=${EVENTS_API_TOKEN}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+    networks:
+      - credential-broker-network
+    restart: "no"  # MCP is typically run on-demand
+    profiles:
+      - mcp  # Use: docker-compose --profile mcp up
+
+networks:
+  credential-broker-network:
+    driver: bridge
+    name: credential-broker-network
 
 volumes:
-  connect-data:
+  logs:
+    driver: local
+  data:
+    driver: local
