@@ -56,7 +56,7 @@
 
 ## 🎯 Implementation Phases
 
-### **Phase 1: Foundation (2-3 hours)** 🏗️
+### **Phase 1: Foundation (2-3 hours)** ✅
 **Goal:** Build the core credential management engine
 
 ```
@@ -302,7 +302,7 @@ Output: Demo-ready, validated system
 ┌─────────────────────────────────────────────────────────────────┐
 │  MILESTONE TRACKER                                              │
 ├─────────────────────────────────────────────────────────────────┤
-│  □ Foundation Complete                          [Phase 1 Done]  │
+│  ✅ Foundation Complete                          [Phase 1 Done]  │
 │    └─ 1Password integration working                             │
 │    └─ JWT tokens generating                                     │
 │    └─ Audit logging active                                      │
@@ -392,10 +392,13 @@ Target: >99% log delivery ✅
 
 ```bash
 # 1. Clone and setup
-cd /path/to/project
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+cd /Users/aniruth/projects/1password-demo
+# Install Poetry (if not already installed)
+curl -sSL https://install.python-poetry.org | python3 -
+
+# Install dependencies
+cd backend
+poetry install
 
 # 2. Configure
 cp .env.example .env

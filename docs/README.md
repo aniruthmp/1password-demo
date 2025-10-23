@@ -80,21 +80,21 @@ A universal credential broker that integrates with the **AI agent ecosystem** by
 
 ```bash
 # 1. Clone the repository
-cd /Users/aniruth/projects/1password
+cd /Users/aniruth/projects/1password-demo
 
-# 2. Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# 2. Install Poetry (if not already installed)
+curl -sSL https://install.python-poetry.org | python3 -
 
 # 3. Install dependencies
-pip install -r requirements.txt
+cd backend
+poetry install
 
 # 4. Configure environment
 cp .env.example .env
 # Edit .env with your 1Password credentials
 
-# 5. Create project structure
-mkdir -p src/{core,mcp,a2a,acp,ui} demos docker scripts tests
+# 5. Activate Poetry shell
+poetry shell
 ```
 
 ### Running the Servers
@@ -193,7 +193,7 @@ response = requests.post("http://localhost:8001/run", json={
 
 ```
 ✅ Phase 0: Planning Complete (100%)
-□  Phase 1: Foundation & Core (0%)
+✅  Phase 1: Foundation & Core (100%)
 □  Phase 2: MCP Server (0%)
 □  Phase 3: A2A Server (0%)
 □  Phase 4: ACP Server (0%)
@@ -203,8 +203,8 @@ response = requests.post("http://localhost:8001/run", json={
 □  Phase 8: Final Validation (0%)
 ```
 
-**Current Status:** 📋 Planning Complete - Ready for Implementation  
-**Next Step:** Begin Phase 1, Task 1.1.1 (see [TODO.md](TODO.md))  
+**Current Status:** 🏗️ Phase 1 Complete - Foundation Ready, Starting Phase 2  
+**Next Step:** Begin Phase 2, Task 2.1.1 (MCP Server Implementation)  
 **Estimated Time to MVP:** 6-8 hours
 
 ---
@@ -308,7 +308,7 @@ project-root/
 ├── PLANNING_SUMMARY.md                ← Certification & coverage verification
 ├── PRD-ver-1.0.md                     ← Product requirements
 ├── poc.md                             ← Technical proof-of-concept
-├── requirements.txt                   ← Python dependencies (to be created)
+├── pyproject.toml                     ← Poetry dependencies
 ├── .env.example                       ← Environment template (to be created)
 ├── docker-compose.yml                 ← Docker orchestration (to be created)
 ├── src/                               ← Source code (to be created)
@@ -327,17 +327,18 @@ project-root/
 ## 🚦 Current Status
 
 **Planning Phase:** ✅ **COMPLETE** (100%)  
-**Implementation Phase:** 🟡 **READY TO START** (0%)  
-**Estimated Completion:** 7-11 hours from start
+**Implementation Phase:** 🏗️ **IN PROGRESS** (12.5% - Phase 1 Complete)  
+**Estimated Completion:** 5-7 hours remaining
 
 ---
 
 ## 📞 Next Steps
 
 1. ✅ **Review documentation** - Read TODO.md for detailed tasks
-2. ⏭️ **Set up environment** - Install dependencies, configure 1Password
-3. ⏭️ **Start Phase 1** - Begin with Task 1.1.1 (project structure)
-4. ⏭️ **Track progress** - Update IMPLEMENTATION_CHECKLIST.md as you go
+2. ✅ **Set up environment** - Install dependencies, configure 1Password
+3. ✅ **Start Phase 1** - Begin with Task 1.1.1 (project structure)
+4. ⏭️ **Start Phase 2** - Begin MCP Server implementation (Task 2.1.1)
+5. ⏭️ **Track progress** - Update IMPLEMENTATION_CHECKLIST.md as you go
 
 ---
 

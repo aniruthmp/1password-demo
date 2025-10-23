@@ -17,7 +17,7 @@
   - **Time:** 15 min
 
 - [ ] **Task 1.1.2**: Configure dependency management
-  - Create `requirements.txt` with core dependencies:
+  - Create `pyproject.toml` with core dependencies:
     - `fastapi>=0.115.0`
     - `uvicorn[standard]`
     - `pydantic>=2.0`
@@ -112,7 +112,7 @@
 
 ### 2.1 MCP Protocol Foundation
 - [ ] **Task 2.1.1**: Install MCP Python SDK
-  - Add `mcp` to `requirements.txt`
+  - Add `mcp` to `pyproject.toml`
   - Verify compatibility with Python 3.12+
   - **Time:** 5 min
   - **Documentation Reference:** `/modelcontextprotocol/python-sdk`
@@ -606,9 +606,12 @@ Before marking the project complete, verify:
 
 ```bash
 # Setup
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
+# Install Poetry (if not already installed)
+curl -sSL https://install.python-poetry.org | python3 -
+
+# Install dependencies
+cd backend
+poetry install
 
 # Configure environment
 cp .env.example .env
