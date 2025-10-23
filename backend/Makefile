@@ -48,8 +48,8 @@ clean: ## Clean up temporary files and caches
 	find . -type d -name "htmlcov" -exec rm -rf {} +
 	find . -type f -name ".coverage" -delete
 
-shell: ## Start Poetry shell
-	poetry shell
+shell: ## Activate Poetry environment
+	poetry env activate
 
 update: ## Update dependencies
 	poetry update

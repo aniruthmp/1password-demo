@@ -6,13 +6,17 @@ IMPORTANT: Run this script from the backend directory using Poetry:
     cd backend
     poetry run python scripts/test_phase1.py
     
-Or activate the Poetry shell first:
+Or activate the Poetry environment first:
     cd backend
-    poetry shell
+    poetry env activate
     python scripts/test_phase1.py
 """
 import os
 import sys
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Add the parent directory to the Python path so we can import from src
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -25,9 +29,9 @@ except ImportError as e:
     print("\n💡 Solution: Run this script using Poetry:")
     print("   cd backend")
     print("   poetry run python scripts/test_phase1.py")
-    print("\n   Or activate Poetry shell first:")
+    print("\n   Or activate Poetry environment first:")
     print("   cd backend")
-    print("   poetry shell")
+    print("   poetry env activate")
     print("   python scripts/test_phase1.py")
     sys.exit(1)
 

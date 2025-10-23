@@ -88,7 +88,7 @@ assert jwt.decode(token)["exp"] - jwt.decode(token)["iat"] == 300  # 5 min
 
 ---
 
-### **Phase 2: MCP Server (1-2 hours)** 🔧
+### **Phase 2: MCP Server (1-2 hours)** ✅
 **Goal:** Enable AI models to request credentials as tools
 
 ```
@@ -103,6 +103,7 @@ Output: AI-accessible credential retrieval tool
 - ✅ list_tools endpoint for discovery
 - ✅ JSON-RPC transport (stdio)
 - ✅ Demo: AI assistant fetching DB credentials
+- ✅ Testing and validation complete
 
 **Testing Checkpoint:**
 ```python
@@ -307,12 +308,12 @@ Output: Demo-ready, validated system
 │    └─ JWT tokens generating                                     │
 │    └─ Audit logging active                                      │
 │                                                                 │
-│  □ MCP Protocol Operational                     [Phase 2 Done]  │
+│  ✅ MCP Protocol Operational                     [Phase 2 Done]  │
 │    └─ Tool discoverable by AI models                            │
 │    └─ Credentials retrievable via tool call                     │
 │    └─ Demo scenario 1 working                                   │
 │                                                                 │
-│  □ A2A Protocol Operational                     [Phase 3 Done]  │
+│  ✅ A2A Protocol Operational                     [Phase 3 Done]  │
 │    └─ Agent card published                                      │
 │    └─ Agent-to-agent collaboration working                      │
 │    └─ Demo scenario 2 working                                   │
@@ -350,11 +351,11 @@ Output: Demo-ready, validated system
 
 ### **Protocol Coverage**
 ```
-✓ MCP Server: get_credentials tool operational
-✓ A2A Server: Agent card + task execution
-✓ ACP Server: /agents + /run + /sessions
+✅ MCP Server: get_credentials tool operational
+✅ A2A Server: Agent card + task execution
+□  ACP Server: /agents + /run + /sessions
 
-Target: 3/3 protocols ✅
+Target: 2/3 protocols complete (67%)
 ```
 
 ### **Security**
