@@ -28,11 +28,17 @@ fi
 # Load environment variables
 export $(grep -v '^#' "$PROJECT_ROOT/.env" | xargs)
 
-# Check if Streamlit is installed
-if ! command -v streamlit &> /dev/null; then
-    echo -e "${YELLOW}Streamlit not found. Installing...${NC}"
-    poetry install --extras ui
+# Check if Poetry is installed
+if ! command -v poetry &> /dev/null; then
+    echo -e "${YELLOW}Poetry not found. Please install Poetry first:${NC}"
+    echo -e "${YELLOW}  curl -sSL https://install.python-poetry.org | python3 -${NC}"
+    exit 1
 fi
+
+# Check if dependencies are installed
+echo -e "${GREEN}✓ Checking dependencies...${NC}"
+cd "$PROJECT_ROOT"
+poetry install --extras ui --no-interaction --quiet
 
 echo -e "${GREEN}✓ Environment loaded${NC}"
 echo -e "${GREEN}✓ Starting Streamlit dashboard...${NC}"
@@ -40,11 +46,8 @@ echo ""
 echo -e "${BLUE}Dashboard will be available at: http://localhost:8501${NC}"
 echo ""
 
-# Change to project root
-cd "$PROJECT_ROOT"
-
-# Run Streamlit dashboard
-streamlit run src/ui/dashboard.py \
+# Run Streamlit dashboard using Poetry's virtual environment
+poetry run streamlit run src/ui/dashboard.py \
     --server.port=8501 \
     --server.address=0.0.0.0 \
     --server.headless=true \
