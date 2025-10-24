@@ -1,12 +1,132 @@
-# Testing Scripts
+# Helper Scripts
 
-This directory contains interactive testing scripts to validate each phase of the 1Password Credential Broker implementation.
+This directory contains comprehensive helper scripts for managing, testing, and operating the Universal 1Password Credential Broker.
 
 ---
 
 ## 📋 Available Scripts
 
-### MCP Server Launcher
+### Service Management Scripts
+
+#### Start All Services
+**Script:** `start-all.sh`  
+**Purpose:** Start all services (A2A, ACP) with comprehensive setup and health checks
+
+```bash
+cd backend
+./scripts/start-all.sh
+
+# Docker mode
+./scripts/start-all.sh --docker
+
+# Build Docker images
+./scripts/start-all.sh --docker --build
+
+# Foreground mode (Docker)
+./scripts/start-all.sh --docker --foreground
+
+# Skip specific services
+./scripts/start-all.sh --without-a2a
+./scripts/start-all.sh --without-acp
+
+# Custom log level
+./scripts/start-all.sh --log-level DEBUG
+
+# Show help
+./scripts/start-all.sh --help
+```
+
+**What it does:**
+- ✅ Verifies .env file exists and loads environment variables
+- ✅ Checks for required environment variables
+- ✅ Verifies Poetry installation and dependencies
+- ✅ Creates necessary directories (logs, data)
+- ✅ Starts A2A server on port 8000
+- ✅ Starts ACP server on port 8001
+- ✅ Displays service status and endpoints
+- ✅ Runs health checks
+- ✅ Supports Docker mode with container orchestration
+
+**Prerequisites:**
+- Poetry installed
+- .env file configured with 1Password credentials
+- Dependencies installed (`poetry install`)
+- Ports 8000 and 8001 available (or use Docker mode)
+
+---
+
+#### Stop All Services
+**Script:** `stop-all.sh`  
+**Purpose:** Gracefully stop all services with cleanup options
+
+```bash
+cd backend
+./scripts/stop-all.sh
+
+# Docker mode
+./scripts/stop-all.sh --docker
+
+# Force kill processes
+./scripts/stop-all.sh --force
+
+# Clean log files
+./scripts/stop-all.sh --clean-logs
+
+# Docker cleanup (remove volumes)
+./scripts/stop-all.sh --docker --clean
+
+# Docker purge (remove volumes and images)
+./scripts/stop-all.sh --docker --purge
+
+# Quiet mode
+./scripts/stop-all.sh --quiet
+
+# Show help
+./scripts/stop-all.sh --help
+```
+
+**What it does:**
+- ✅ Gracefully stops A2A and ACP servers
+- ✅ Removes PID files
+- ✅ Handles both Docker and non-Docker modes
+- ✅ Optional log file cleanup
+- ✅ Optional Docker volume/image cleanup
+- ✅ Force kill option for stubborn processes
+
+---
+
+#### Health Check
+**Script:** `health-check.sh`  
+**Purpose:** Verify all services are running and healthy
+
+```bash
+cd backend
+./scripts/health-check.sh
+
+# Docker mode
+./scripts/health-check.sh --docker
+
+# Quiet mode (minimal output)
+./scripts/health-check.sh --quiet
+
+# Show help
+./scripts/health-check.sh --help
+```
+
+**What it checks:**
+- ✅ Service process status (non-Docker) or container status (Docker)
+- ✅ HTTP health endpoints
+- ✅ Service response validation
+- ✅ Overall system health status
+
+**Prerequisites:**
+- Services must be running (start with `./scripts/start-all.sh`)
+
+---
+
+### Individual Server Scripts
+
+#### MCP Server Launcher
 **Script:** `mcp_server.sh`  
 **Purpose:** Start the MCP server with proper environment setup
 
@@ -36,7 +156,7 @@ cd backend
 
 ---
 
-### A2A Server Launcher
+#### A2A Server Launcher
 **Script:** `a2a_server.sh`  
 **Purpose:** Start the A2A (Agent-to-Agent) server with proper environment setup
 
@@ -82,393 +202,12 @@ cd backend
 
 ---
 
-### Phase 1: Core Foundation Testing
-**Script:** `test_phase1.py`  
-**Tests:** Core credential management, token generation, encryption
-
-```bash
-cd backend
-poetry env activate
-python scripts/test_phase1.py
-```
-
-**What it tests:**
-- ✅ Health checks for CredentialManager
-- ✅ 1Password Connect API connectivity
-- ✅ Credential retrieval from vault
-- ✅ JWT token generation with encryption
-- ✅ Token validation and expiration
-- ✅ Credential decryption from tokens
-
-**Prerequisites:**
-- 1Password Connect server running
-- Valid credentials in `.env` file
-- At least one item in your 1Password vault
-
----
-
-### Phase 2: MCP Server Testing
-**Script:** `test_phase2.py`  
-**Tests:** Model Context Protocol server implementation
-
-```bash
-cd backend
-poetry env activate
-python scripts/test_phase2.py
-```
-
-**What it tests:**
-- ✅ MCP server startup and connectivity
-- ✅ Tool discovery (`list_tools`)
-- ✅ Credential retrieval via `get_credentials` tool
-- ✅ Ephemeral token generation through MCP
-- ✅ Error handling and validation
-- ✅ Audit logging integration
-
-**Prerequisites:**
-- Phase 1 components working (run `test_phase1.py` first)
-- 1Password Connect server running
-- Valid credentials in `.env` file
-
----
-
-## 🚀 Quick Start Guide
-
-### First Time Setup
-
-1. **Configure Environment**
-   ```bash
-   cd backend
-   cp .env.example .env
-   # Edit .env with your 1Password credentials
-   ```
-
-2. **Install Dependencies**
-   ```bash
-   poetry install
-   ```
-
-3. **Activate Poetry Environment**
-   ```bash
-   poetry env activate
-   ```
-
-### Testing Workflow
-
-**Step 1: Test Phase 1 (Core Components)**
-```bash
-cd backend
-poetry run python scripts/test_phase1.py
-```
-
-Follow the interactive prompts to:
-- Verify health checks
-- Enter a resource type (database/api/ssh/generic)
-- Enter an existing 1Password item name
-- Watch the credential retrieval and token generation process
-
-**Example interaction:**
-```
-🔐 Phase 1 Validation Test
-============================================
-
-1. Health Check...
-   Status: healthy
-   1Password: healthy
-   Token Manager: healthy
-
-2. Credential Testing...
-   Enter resource type (database/api/ssh/generic): database
-   Enter 1Password item name: test-database
-   Enter agent ID: test-agent
-
-3. Fetching credentials for database/test-database...
-   ✅ Success! Found 4 credential fields
-   Fields: ['username', 'password', 'host', 'port']
-
-... (continues with token generation and validation)
-```
-
-**Step 2: Test Phase 2 (MCP Server)**
-```bash
-cd backend
-poetry run python scripts/test_phase2.py
-```
-
-Follow the interactive prompts to:
-- Discover available MCP tools
-- Select a resource type
-- Request credentials via MCP protocol
-- Optionally test error handling
-
-**Step 3: Test Phase 3 (A2A Server)**
-
-First, start the A2A server in a separate terminal:
-```bash
-cd backend
-
-# Option 1: Use the launcher script (recommended)
-./scripts/a2a_server.sh
-
-# Option 2: Direct Python command
-poetry run python src/a2a/run_a2a.py
-```
-
-Then run the test in another terminal:
-```bash
-cd backend
-poetry run python scripts/test_phase3.py
-```
-
-Follow the interactive prompts to:
-- Verify server connectivity
-- Discover agent card
-- Select a resource type
-- Request credentials via A2A protocol
-- Optionally test authentication and error handling
-
-**Example interaction (Phase 2):**
-```
-============================================================
-  Phase 2 Validation Test - MCP Server
-============================================================
-
-1. Connecting to MCP Server...
-   ✅ Connected to MCP server successfully
-
-2. Discovering Available Tools...
-   ✅ Found 1 tool(s)
-     Tool: get_credentials
-     Description: Retrieve ephemeral credentials from 1Password vault...
-     Required parameters: resource_type, resource_name, requesting_agent_id
-
-3. Credential Request Test...
-   Let's test retrieving credentials from 1Password
-
-   Available resource types:
-     1. database
-     2. api
-     3. ssh
-     4. generic
-
-   Select resource type [1-4] or enter custom: 1
-   Enter 1Password item name: test-database
-   Enter agent ID (default: phase2-tester): my-agent
-   Enter TTL in minutes (default: 5, max: 15): 5
-
-4. Requesting Credentials for database/test-database...
-   ✅ Credential request completed!
-
-   Response from MCP server:
-   --------------------------------------------------------
-   ✅ Ephemeral credentials generated successfully
-
-   Resource: database/test-database
-   Token: eyJhbGciOiJIUzI1N...
-   Expires in: 300 seconds (5 minutes)
-   ...
-   --------------------------------------------------------
-
-... (continues with optional error handling test)
-```
-
----
-
-### Phase 3: A2A Server Testing
-**Script:** `test_phase3.py`  
-**Tests:** Agent-to-Agent protocol server implementation
-
-```bash
-# Step 1: Start the A2A server (in a separate terminal)
-cd backend
-
-# Option 1: Use the launcher script (recommended)
-./scripts/a2a_server.sh
-
-# Option 2: Direct Python command
-poetry run python src/a2a/run_a2a.py
-
-# Step 2: Run the test script (in another terminal)
-cd backend
-poetry run python scripts/test_phase3.py
-```
-
-**What it tests:**
-- ✅ A2A server connectivity and health
-- ✅ Agent card discovery endpoint
-- ✅ Task execution with capability routing
-- ✅ Bearer token authentication
-- ✅ All 4 capability handlers (database, api, ssh, generic)
-- ✅ Error handling and validation
-- ✅ Credential provisioning via A2A protocol
-
-**Prerequisites:**
-- Phase 1 and Phase 2 components working
-- A2A server running on http://localhost:8000
-- Valid credentials in `.env` file
-- At least one item in your 1Password vault
-
-**Example interaction:**
-```
-============================================================
-  Phase 3 Validation Test - A2A Server
-============================================================
-
-1. Server Connectivity Check...
-   ✅ A2A server is running
-     Status: healthy
-     Service: a2a-server
-     Version: 1.0.0
-
-2. Agent Card Discovery...
-   ✅ Agent card retrieved successfully
-     Agent Information:
-       ID: 1password-credential-broker
-       Name: 1Password Ephemeral Credential Agent
-       Version: 1.0.0
-       Authentication: bearer_token
-
-     Capabilities (4 total):
-       1. request_database_credentials
-          Description: Request temporary database credentials...
-       2. request_api_credentials
-       3. request_ssh_credentials
-       4. request_generic_secret
-
-3. Task Execution - Database Credentials...
-   Select resource type [1-4]: 1
-   Enter 1Password item name: test-database
-   Enter TTL in minutes (default: 5, max: 15): 5
-
-   ✅ Task executed successfully
-     Status: completed
-     Execution Time: 245.32ms
-     
-     Credential Details:
-       Token: eyJhbGciOiJIUzI1N... (truncated)
-       Expires In: 300 seconds
-       Issued At: 2025-10-23T12:34:56Z
-
-... (continues with optional tests)
-```
-
----
-
-### Phase 4: ACP Server Testing
-**Script:** `test_phase4.py`  
-**Tests:** Agent Communication Protocol server implementation
-
-```bash
-# Step 1: Start the ACP server (in a separate terminal)
-cd backend
-
-# Option 1: Use the launcher script (recommended)
-./scripts/acp_server.sh
-
-# Option 2: Direct Python command
-poetry run python src/acp/run_acp.py
-
-# Step 2: Run the test script (in another terminal)
-cd backend
-poetry run python scripts/test_phase4.py
-```
-
-**What it tests:**
-- ✅ ACP server connectivity and health
-- ✅ Agent discovery via /agents endpoint
-- ✅ Natural language credential requests
-- ✅ Intent parsing (database, API, SSH extraction)
-- ✅ Session management and tracking
-- ✅ Interaction history retrieval
-- ✅ Multiple credential types in same session
-- ✅ Error handling and validation
-- ✅ Credential provisioning via ACP protocol
-
-**Prerequisites:**
-- Phase 1, 2, and 3 components working
-- ACP server running on http://localhost:8001
-- Valid credentials in `.env` file
-- At least one item in your 1Password vault
-
-**Example interaction:**
-```
-============================================================
-  Phase 4 Validation Test - ACP Server
-============================================================
-
-1. Server Connectivity Check
-----------------------------------------------------------------------
-   ✅ ACP server is running
-     Status: healthy
-     Service: acp-server
-     Version: 1.0.0
-
-2. Agent Discovery
-----------------------------------------------------------------------
-   ✅ Agent discovery successful
-     Found 1 agent(s)
-
-     Agent Information:
-       Name: credential-broker
-       Description: Ephemeral credential provisioning from...
-       Version: 1.0.0
-
-     Capabilities (6 total):
-       • database_credentials
-       • api_credentials
-       • ssh_credentials
-       • generic_secrets
-       • natural_language_parsing
-       • session_management
-
-3. Natural Language Credential Requests
-----------------------------------------------------------------------
-   Testing multiple credential types with session management...
-
-   Test 3.1: Database Credentials
-     Request: 'I need database credentials for production-postgres'
-
-   ✅ Request completed successfully
-     Status: completed
-     Run ID: run-123e4567...
-     Session ID: session-123e4567...
-     Execution Time: 234.56ms
-
-     Output:
-       Text Response:
-         ✅ Generated ephemeral database credentials for production-postgres.
-         Token expires in 5 minutes (300 seconds).
-       JWT Token:
-         eyJhbGciOiJIUzI1N... (truncated)
-
-... (continues with API and SSH credential tests)
-
-4. Session History
-----------------------------------------------------------------------
-   ✅ Session history retrieved
-     Session ID: session-123e4567...
-     Interaction Count: 3
-
-     Interaction History:
-       1. 2025-10-23T12:34:56Z
-          Run ID: run-abc...
-          Status: completed
-          Input: I need database credentials for...
-          Output: Generated ephemeral database credentials...
-
-... (continues with error handling tests)
-```
-
----
-
-### ACP Server Launcher
+#### ACP Server Launcher
 **Script:** `acp_server.sh`  
 **Purpose:** Start the ACP (Agent Communication Protocol) server with proper environment setup
 
 ```bash
 cd backend
-
-# Basic usage (default settings)
 ./scripts/acp_server.sh
 
 # Custom port
@@ -509,222 +248,291 @@ cd backend
 
 ---
 
+### Dashboard Script
+
+#### Dashboard Launcher
+**Script:** `run_dashboard.sh`  
+**Purpose:** Start the Streamlit dashboard with proper environment setup
+
+```bash
+cd backend
+./scripts/run_dashboard.sh
+```
+
+**What it does:**
+- ✅ Checks for .env file and loads environment variables
+- ✅ Verifies Poetry installation
+- ✅ Installs UI dependencies (`poetry install --extras ui`)
+- ✅ Finds available port (8501, 8503, 8504)
+- ✅ Starts Streamlit dashboard with proper configuration
+- ✅ Displays dashboard URL
+
+**Prerequisites:**
+- Poetry installed
+- .env file configured
+- UI dependencies will be installed automatically
+
+**Access**: Dashboard will be available at http://localhost:8501 (or alternative port)
+
+---
+
+### Testing & Demo Scripts
+
+#### Automated Demo Script
+**Script:** `demo.sh`  
+**Purpose:** Generate random traffic to all servers for dashboard metrics
+
+```bash
+cd backend
+./scripts/demo.sh
+
+# Custom iterations and delay
+./scripts/demo.sh --iterations 20 --delay 1
+
+# Continuous mode
+./scripts/demo.sh --continuous
+
+# Show help
+./scripts/demo.sh --help
+```
+
+**What it does:**
+- ✅ Checks server availability (A2A, ACP, MCP)
+- ✅ Generates random credential requests across all protocols
+- ✅ Tests various resource types (database, API, SSH)
+- ✅ Provides real-time success/failure statistics
+- ✅ Supports continuous mode for ongoing testing
+- ✅ Compatible with dashboard metrics collection
+
+**Test Types:**
+- **A2A Tests**: Agent card discovery, database credentials, API credentials
+- **ACP Tests**: Agent discovery, natural language requests, session management
+- **MCP Tests**: Protocol communication via Poetry stdio
+
+**Prerequisites:**
+- A2A server running on port 8000
+- ACP server running on port 8001
+- Poetry available for MCP testing
+- Valid 1Password credentials in .env
+
+---
+
+## 🚀 Quick Start Guide
+
+### First Time Setup
+
+1. **Configure Environment**
+   ```bash
+   cd backend
+   cp .env.example .env
+   # Edit .env with your 1Password credentials
+   ```
+
+2. **Install Dependencies**
+   ```bash
+   poetry install
+   ```
+
+3. **Start All Services**
+   ```bash
+   ./scripts/start-all.sh
+   ```
+
+4. **Check Health**
+   ```bash
+   ./scripts/health-check.sh
+   ```
+
+5. **Run Demo**
+   ```bash
+   ./scripts/demo.sh --iterations 10
+   ```
+
+6. **Start Dashboard**
+   ```bash
+   ./scripts/run_dashboard.sh
+   ```
+
+### Common Workflows
+
+#### Development Workflow
+```bash
+# Start services in development mode
+./scripts/a2a_server.sh --reload --log-level DEBUG
+./scripts/acp_server.sh --reload --log-level DEBUG
+
+# Run tests
+./scripts/demo.sh --iterations 5
+
+# Check health
+./scripts/health-check.sh
+
+# Stop services
+./scripts/stop-all.sh
+```
+
+#### Production Workflow
+```bash
+# Start with multiple workers
+./scripts/a2a_server.sh --workers 4 --log-level INFO
+./scripts/acp_server.sh --workers 4 --log-level INFO
+
+# Monitor health
+./scripts/health-check.sh --quiet
+
+# Stop gracefully
+./scripts/stop-all.sh
+```
+
+#### Docker Workflow
+```bash
+# Start with Docker
+./scripts/start-all.sh --docker --build
+
+# Check Docker health
+./scripts/health-check.sh --docker
+
+# Stop Docker services
+./scripts/stop-all.sh --docker --clean
+```
+
+---
+
 ## 🔧 Troubleshooting
 
 ### Common Issues
 
-#### "Import Error: Missing dependencies"
+#### "Service not responding"
+**Causes:**
+- Service failed to start
+- Port already in use
+- Environment variables missing
+
 **Solution:**
 ```bash
-cd backend
+# Check health
+./scripts/health-check.sh
+
+# Check logs
+tail -f logs/*.log
+
+# Restart services
+./scripts/stop-all.sh
+./scripts/start-all.sh
+```
+
+#### "Port already in use"
+**Causes:**
+- Another service using the port
+- Previous service not stopped properly
+
+**Solution:**
+```bash
+# Use different port
+./scripts/a2a_server.sh --port 8001
+
+# Or stop existing services
+./scripts/stop-all.sh --force
+```
+
+#### "Poetry not found"
+**Causes:**
+- Poetry not installed
+- Poetry not in PATH
+
+**Solution:**
+```bash
+# Install Poetry
+curl -sSL https://install.python-poetry.org | python3 -
+
+# Verify installation
+poetry --version
+```
+
+#### "Dependencies not installed"
+**Causes:**
+- Poetry dependencies not installed
+- Virtual environment not created
+
+**Solution:**
+```bash
+# Install dependencies
 poetry install
-poetry env activate
+
+# For UI dependencies
+poetry install --extras ui
 ```
 
-#### "1Password Connect health check failed"
+#### "Environment variables missing"
 **Causes:**
-- 1Password Connect server not running
-- Invalid `OP_CONNECT_HOST` or `OP_CONNECT_TOKEN` in `.env`
-- Network connectivity issues
-
-**Solution:**
-1. Verify 1Password Connect is running
-2. Check `.env` configuration
-3. Test connectivity: `curl $OP_CONNECT_HOST/health`
-
-#### "Resource not found in 1Password vault"
-**Causes:**
-- Item name doesn't exist in vault
-- Case sensitivity mismatch
-- Item in different vault
-
-**Solution:**
-1. Check item exists in 1Password
-2. Use exact item title (case-sensitive)
-3. Verify `OP_VAULT_ID` in `.env`
-
-#### "MCP server connection failed"
-**Causes:**
-- Server failed to start
-- Permission issues
-- Missing MCP SDK
+- .env file not found
+- Required variables not set
 
 **Solution:**
 ```bash
-# Reinstall MCP SDK
-poetry add mcp
+# Create .env file
+cp .env.example .env
 
-# Run with debug logging
-python scripts/test_phase2.py
-# (script uses ERROR level by default, modify for DEBUG if needed)
+# Edit with your values
+nano .env
 ```
-
-#### "A2A server not accessible"
-**Causes:**
-- A2A server not running
-- Port 8000 already in use
-- Firewall blocking connections
-
-**Solution:**
-```bash
-# Check if server is running
-curl http://localhost:8000/health
-
-# Start the server if not running
-poetry run python src/a2a/run_a2a.py
-
-# Check if port 8000 is in use
-lsof -i :8000
-
-# Try a different port
-poetry run python src/a2a/run_a2a.py --port 8001
-```
-
-#### "Authentication failed (401)"
-**Causes:**
-- Missing or invalid bearer token
-- Token mismatch between client and server
-
-**Solution:**
-1. Check `.env` file for `A2A_BEARER_TOKEN`
-2. Ensure test scripts use the same token
-3. Default token: `dev-token-change-in-production`
-
-#### "Task execution failed"
-**Causes:**
-- Invalid capability name
-- Missing required parameters
-- Resource not found in vault
-
-**Solution:**
-1. Check capability names in agent card
-2. Verify all required parameters provided
-3. Ensure resource exists in 1Password vault
-
-#### "ACP server not accessible"
-**Causes:**
-- ACP server not running
-- Port 8001 already in use
-- Firewall blocking connections
-
-**Solution:**
-```bash
-# Check if server is running
-curl http://localhost:8001/health
-
-# Start the server if not running
-poetry run python src/acp/run_acp.py
-
-# Check if port 8001 is in use
-lsof -i :8001
-
-# Try a different port
-poetry run python src/acp/run_acp.py --port 8002
-```
-
-#### "Intent parsing failed"
-**Causes:**
-- Request text too vague or ambiguous
-- Resource name not recognized
-- Missing keywords
-
-**Solution:**
-1. Use clear, specific language:
-   - ✅ "I need database credentials for production-postgres"
-   - ❌ "Get me some creds"
-2. Include resource type keywords (database, api, ssh)
-3. Include resource name explicitly
-4. Check demo examples for proper formatting
-
-#### "Session not found"
-**Causes:**
-- Session ID doesn't exist
-- Session expired
-- Server restarted (in-memory sessions lost)
-
-**Solution:**
-1. Verify session ID is correct
-2. Check if server was restarted
-3. Create new session if needed (omit session_id in request)
 
 ---
 
-## 📊 Test Coverage
+## 📊 Script Features
 
-### Phase 1 Tests Cover:
-- CredentialManager initialization
-- OnePasswordClient connectivity
-- TokenManager encryption/decryption
-- AuditLogger event posting
-- End-to-end credential flow
+### Error Handling
+- ✅ Comprehensive error checking
+- ✅ Graceful failure handling
+- ✅ Clear error messages
+- ✅ Exit codes for automation
 
-### Phase 2 Tests Cover:
-- MCP server initialization
-- stdio transport communication
-- Tool registration and discovery
-- Credential retrieval via MCP protocol
-- Error handling and validation
-- Integration with Phase 1 components
+### Logging
+- ✅ Structured output with colors
+- ✅ Progress indicators
+- ✅ Success/failure status
+- ✅ Debug information
 
-### Phase 3 Tests Cover:
-- A2A server initialization and health
-- Agent card discovery and validation
-- Task execution with capability routing
-- Bearer token authentication
-- All 4 capability handlers:
-  - Database credentials
-  - API credentials
-  - SSH credentials
-  - Generic secrets
-- Error handling and validation
-- SSE streaming support (via endpoints)
-- Integration with Phase 1 components
+### Port Management
+- ✅ Port availability checking
+- ✅ Automatic port selection (dashboard)
+- ✅ Port conflict resolution
 
-### Phase 4 Tests Cover:
-- ACP server initialization and health
-- Agent discovery via /agents endpoint
-- Natural language intent parsing:
-  - Database credential requests
-  - API credential requests
-  - SSH key requests
-  - Generic secret requests
-- Session management and creation
-- Interaction history tracking
-- Multi-request sessions (conversation context)
-- Session history retrieval
-- Error handling:
-  - Unknown agent names
-  - Unparseable requests
-  - Nonexistent sessions
-- Integration with Phase 1 components
-- All REST endpoints (/agents, /run, /sessions/{id}, /health)
+### Environment Management
+- ✅ Automatic .env loading
+- ✅ Environment variable validation
+- ✅ Poetry environment activation
+
+### Docker Support
+- ✅ Full Docker Compose integration
+- ✅ Container health checking
+- ✅ Volume management
+- ✅ Image building
 
 ---
 
 ## 🎯 Next Steps
 
-After successfully running all test scripts:
+After successfully using the helper scripts:
 
-1. ✅ **Phase 1:** Core Foundation ✅ COMPLETE
-2. ✅ **Phase 2:** MCP Server ✅ COMPLETE
-3. ✅ **Phase 3:** A2A Server ✅ COMPLETE
-4. ✅ **Phase 4:** ACP Server ✅ COMPLETE
-5. **Phase 5:** Add Docker orchestration
-6. **Phase 6:** Create demo UI (optional)
-7. **Phase 7:** Complete documentation
-8. **Phase 8:** Final validation
+1. ✅ **Service Management** - Start/stop/health check services
+2. ✅ **Individual Servers** - Run MCP, A2A, ACP servers
+3. ✅ **Dashboard** - Monitor with real-time UI
+4. ✅ **Testing** - Automated demo and validation
+5. **Integration** - Connect with your AI agents
+6. **Production** - Deploy with proper configuration
 
-**Current Progress:** 4/8 phases complete (50%)
+**Current Progress:** All helper scripts operational ✅
 
 ---
 
 ## 📝 Notes
 
-- **Test scripts are interactive** - They require user input during execution
-- **Safe to run multiple times** - No destructive operations
+- **Scripts are safe to run multiple times** - No destructive operations
 - **Production credentials** - Use test credentials only
 - **Audit logs** - All credential access is logged to 1Password Events API
 - **Token expiry** - Test tokens expire after configured TTL (default 5 minutes)
+- **Docker support** - Full container orchestration available
 
 ---
 
@@ -737,10 +545,11 @@ If you encounter issues:
 3. Verify all prerequisites are met
 4. Check `.env` configuration
 5. Review the main README in `backend/README.md`
+6. Use `--help` flag with any script for usage information
 
 ---
 
 **Last Updated:** October 23, 2025  
-**Status:** Phase 1, 2, 3 & 4 Complete ✅  
-**Progress:** 4/8 phases (50%)
+**Status:** All Scripts Complete ✅  
+**Progress:** 8/8 scripts operational (100%)
 

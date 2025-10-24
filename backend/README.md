@@ -120,16 +120,16 @@ backend/
 │   ├── mcp_demo.py           # MCP client demo
 │   ├── a2a_demo.py           # A2A client demo
 │   └── acp_demo.py           # ACP client demo
-├── scripts/            # Interactive testing and server scripts ✅
-│   ├── test_phase1.py        # Phase 1 interactive test
-│   ├── test_phase2.py        # Phase 2 interactive test
-│   ├── test_phase3.py        # Phase 3 interactive test
-│   ├── test_phase4.py        # Phase 4 interactive test
+├── scripts/            # Helper scripts for management and testing ✅
+│   ├── start-all.sh          # Start all services (A2A, ACP) with options
+│   ├── stop-all.sh           # Stop all services gracefully
+│   ├── health-check.sh       # Check service health (Docker/non-Docker)
+│   ├── demo.sh               # Automated demo script for dashboard metrics
 │   ├── mcp_server.sh         # MCP server startup script
 │   ├── a2a_server.sh         # A2A server startup script
 │   ├── acp_server.sh         # ACP server startup script
 │   ├── run_dashboard.sh      # Dashboard startup script
-│   └── README.md             # Testing guide
+│   └── README.md             # Comprehensive script documentation
 ├── config/             # Configuration files
 ├── pyproject.toml      # Poetry dependencies and configuration
 └── poetry.lock         # Locked dependency versions
@@ -189,32 +189,54 @@ make install        # Install production dependencies
 make install-dev    # Install with dev dependencies
 ```
 
-## Testing & Validation
+## Quick Start with Helper Scripts
 
-### Prerequisites Setup
+The easiest way to get started is using the provided helper scripts:
 
-1. **Start 1Password Connect Services:**
-   ```bash
-   cd backend
-   docker-compose up -d
-   ```
+### Start All Services
+```bash
+cd backend
+./scripts/start-all.sh
+```
 
-2. **Verify Connect API is running:**
-   ```bash
-   curl http://localhost:8080/health
-   # Should return: {"status":"healthy"}
-   ```
+This will:
+- ✅ Check prerequisites (Poetry, .env, dependencies)
+- ✅ Start A2A server on port 8000
+- ✅ Start ACP server on port 8001
+- ✅ Display service status and endpoints
+- ✅ Run health checks
 
-3. **Configure Environment:**
-   ```bash
-   # Copy and edit environment file
-   cp .env.example .env
-   # Edit .env with your actual values:
-   # OP_CONNECT_HOST=http://localhost:8080
-   # OP_CONNECT_TOKEN=your_connect_token
-   # OP_VAULT_ID=your_vault_id
-   # JWT_SECRET_KEY=your_32_char_secret_key
-   ```
+### Stop All Services
+```bash
+./scripts/stop-all.sh
+```
+
+### Check Service Health
+```bash
+./scripts/health-check.sh
+```
+
+### Run Automated Demo
+```bash
+./scripts/demo.sh --iterations 10 --delay 2
+```
+
+### Individual Server Scripts
+```bash
+# MCP Server (interactive)
+./scripts/mcp_server.sh
+
+# A2A Server
+./scripts/a2a_server.sh
+
+# ACP Server  
+./scripts/acp_server.sh
+
+# Dashboard
+./scripts/run_dashboard.sh
+```
+
+See `scripts/README.md` for detailed usage instructions and all available options.
 
 ### Phase 1 Validation Tests
 
@@ -354,26 +376,58 @@ except Exception as e:
 "
 ```
 
-### Interactive Testing Scripts
+### Testing & Validation
 
-For easier testing, use the provided interactive scripts:
+#### Prerequisites Setup
+
+1. **Start 1Password Connect Services:**
+   ```bash
+   cd backend
+   docker-compose up -d
+   ```
+
+2. **Verify Connect API is running:**
+   ```bash
+   curl http://localhost:8080/health
+   # Should return: {"status":"healthy"}
+   ```
+
+3. **Configure Environment:**
+   ```bash
+   # Copy and edit environment file
+   cp .env.example .env
+   # Edit .env with your actual values:
+   # OP_CONNECT_HOST=http://localhost:8080
+   # OP_CONNECT_TOKEN=your_connect_token
+   # OP_VAULT_ID=your_vault_id
+   # JWT_SECRET_KEY=your_32_char_secret_key
+   ```
+
+#### Automated Testing
+
+Use the helper scripts for comprehensive testing:
 
 ```bash
-# Phase 1: Core components
-poetry env activate
-poetry run python scripts/test_phase1.py
+# Start all services
+./scripts/start-all.sh
 
-# Phase 2: MCP server
-poetry run python scripts/test_phase2.py
+# Run automated demo with metrics
+./scripts/demo.sh --iterations 20 --delay 1
+
+# Check service health
+./scripts/health-check.sh
+
+# Stop all services
+./scripts/stop-all.sh
 ```
 
-See `scripts/README.md` for detailed usage instructions.
+See `scripts/README.md` for detailed usage instructions and all available options.
 
 ---
 
-## Running the MCP Server
+## Running Individual Servers
 
-### Quick Start (Recommended)
+### MCP Server
 
 Use the provided startup script that handles all setup automatically:
 
@@ -388,7 +442,7 @@ The script will:
 - ✅ Ensure Poetry and dependencies are installed
 - ✅ Start the MCP server with proper settings
 
-### With Custom Log Level
+#### With Custom Log Level
 
 ```bash
 # Info level (default)
@@ -404,14 +458,54 @@ The script will:
 ./scripts/mcp_server.sh --help
 ```
 
+### A2A Server
+
+```bash
+# Basic usage
+./scripts/a2a_server.sh
+
+# Custom port
+./scripts/a2a_server.sh --port 8001
+
+# Development mode with auto-reload
+./scripts/a2a_server.sh --reload --log-level DEBUG
+
+# Production mode with multiple workers
+./scripts/a2a_server.sh --workers 4
+```
+
+### ACP Server
+
+```bash
+# Basic usage
+./scripts/acp_server.sh
+
+# Custom port
+./scripts/acp_server.sh --port 8002
+
+# Development mode with auto-reload
+./scripts/acp_server.sh --reload --log-level DEBUG
+
+# Production mode with multiple workers
+./scripts/acp_server.sh --workers 4
+```
+
 ### Manual Start (Alternative)
 
-You can also start the server manually:
+You can also start servers manually:
 
 ```bash
 cd backend
 poetry env activate
+
+# MCP Server
 python src/mcp/run_mcp.py --log-level INFO
+
+# A2A Server
+python src/a2a/run_a2a.py --host 0.0.0.0 --port 8000
+
+# ACP Server
+python src/acp/run_acp.py --host 0.0.0.0 --port 8001
 ```
 
 ### Expected Output
@@ -746,7 +840,7 @@ cd backend
 streamlit run src/ui/dashboard.py
 ```
 
-**Access**: Dashboard will be available at http://localhost:8501
+**Access**: Dashboard will be available at http://localhost:8501 (or alternative port if 8501 is busy)
 
 #### Prerequisites
 
@@ -781,21 +875,82 @@ ACP_BEARER_TOKEN=dev-token-change-in-production
 
 For full dashboard functionality, start backend servers:
 ```bash
-# Terminal 1 - A2A Server
-python src/a2a/run_a2a.py
+# Option 1: Start all services at once
+./scripts/start-all.sh
 
-# Terminal 2 - ACP Server
-python src/acp/run_acp.py
+# Option 2: Start individual services
+./scripts/a2a_server.sh
+./scripts/acp_server.sh
 
-# Terminal 3 - Dashboard
+# Then start dashboard
 ./scripts/run_dashboard.sh
 ```
 
 **Note**: MCP testing works directly through the credential manager without requiring a running MCP server.
 
-See `src/ui/README.md` for detailed dashboard documentation.
+## Useful Commands
 
----
+### Service Management
+```bash
+# Start all services
+./scripts/start-all.sh
+
+# Stop all services  
+./scripts/stop-all.sh
+
+# Check service health
+./scripts/health-check.sh
+
+# Start with Docker
+./scripts/start-all.sh --docker
+
+# Stop Docker containers
+./scripts/stop-all.sh --docker
+```
+
+### Individual Services
+```bash
+# MCP Server (interactive)
+./scripts/mcp_server.sh
+
+# A2A Server
+./scripts/a2a_server.sh
+
+# ACP Server
+./scripts/acp_server.sh
+
+# Dashboard
+./scripts/run_dashboard.sh
+```
+
+### Testing & Demo
+```bash
+# Automated demo
+./scripts/demo.sh --iterations 10 --delay 2
+
+# Continuous demo mode
+./scripts/demo.sh --continuous
+
+# Run individual demos
+poetry run python demos/mcp_demo.py
+poetry run python demos/a2a_demo.py
+poetry run python demos/acp_demo.py
+```
+
+### Development
+```bash
+# View logs
+tail -f logs/*.log
+
+# Run tests
+make test
+
+# Format code
+make format
+
+# Run linter
+make lint
+```
 
 ## Test Coverage
 

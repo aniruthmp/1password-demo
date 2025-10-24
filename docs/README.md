@@ -100,6 +100,26 @@ poetry shell
 ### Running the Servers
 
 ```bash
+# Quick start with helper scripts (recommended)
+cd backend
+./scripts/start-all.sh
+
+# Check health
+./scripts/health-check.sh
+
+# Run demo
+./scripts/demo.sh --iterations 10
+
+# Start dashboard
+./scripts/run_dashboard.sh
+
+# Stop all services
+./scripts/stop-all.sh
+```
+
+### Manual Server Start (Alternative)
+
+```bash
 # Terminal 1 - MCP Server
 python src/mcp/run_mcp.py
 
@@ -114,6 +134,20 @@ streamlit run src/ui/dashboard.py
 ```
 
 ### Running with Docker
+
+```bash
+# Start all services with helper script
+cd backend
+./scripts/start-all.sh --docker --build
+
+# Check Docker health
+./scripts/health-check.sh --docker
+
+# Stop Docker services
+./scripts/stop-all.sh --docker
+```
+
+### Manual Docker (Alternative)
 
 ```bash
 # Start all services
@@ -197,14 +231,14 @@ response = requests.post("http://localhost:8001/run", json={
 ✅ Phase 2: MCP Server (100%)
 ✅ Phase 3: A2A Server (100%)
 ✅ Phase 4: ACP Server (100%)
-□  Phase 5: Integration (0%)
-□  Phase 6: Demo UI (Optional) (0%)
+✅ Phase 5: Integration (100%)
+✅ Phase 6: Demo UI (Optional) (100%)
 □  Phase 7: Documentation & Testing (0%)
 □  Phase 8: Final Validation (0%)
 ```
 
-**Current Status:** 🏗️ Phase 4 Complete - ACP Server Operational, Starting Phase 5  
-**Next Step:** Begin Phase 5, Task 5.1.1 (Docker Configuration)  
+**Current Status:** 🏗️ Phase 6 Complete - Demo UI Operational, Starting Phase 7  
+**Next Step:** Begin Phase 7, Task 7.1.1 (Documentation & Testing)  
 **Estimated Time to MVP:** 1-2 hours
 
 ---
@@ -224,7 +258,7 @@ response = requests.post("http://localhost:8001/run", json={
 
 | Metric | Target | Current |
 |--------|--------|---------|
-| Protocol Coverage | 3/3 | 1/3 |
+| Protocol Coverage | 3/3 | 3/3 |
 | Credential TTL | <5 min | ✅ |
 | Event Logging | >99% | ✅ |
 | Retrieval Latency | <500ms | ✅ |
@@ -317,9 +351,10 @@ project-root/
 │   ├── a2a/                           ← A2A server
 │   ├── acp/                           ← ACP server
 │   └── ui/                            ← Dashboard (optional)
-├── demos/                             ← Demo scripts (to be created)
-├── tests/                             ← Test suite (to be created)
-└── docker/                            ← Dockerfiles (to be created)
+├── demos/                             ← Demo scripts ✅
+├── tests/                             ← Test suite ✅
+├── scripts/                           ← Helper scripts ✅
+└── docker/                            ← Dockerfiles ✅
 ```
 
 ---
@@ -344,7 +379,7 @@ project-root/
 
 **Created:** October 23, 2025  
 **Last Updated:** October 23, 2025  
-**Status:** 🚀 Ready for Implementation
+**Status:** 🚀 Phase 6 Complete - Demo UI Operational
 
 ---
 

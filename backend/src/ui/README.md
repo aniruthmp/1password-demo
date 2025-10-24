@@ -59,6 +59,19 @@ cd /Users/aniruth/projects/1password-demo/backend
 ./scripts/run_dashboard.sh
 ```
 
+**What the script does:**
+- ✅ Checks for .env file and loads environment variables
+- ✅ Verifies Poetry installation
+- ✅ Installs UI dependencies (`poetry install --extras ui`)
+- ✅ Finds available port (8501, 8503, 8504)
+- ✅ Starts Streamlit dashboard with proper configuration
+- ✅ Displays dashboard URL
+
+**Prerequisites:**
+- Poetry installed
+- .env file configured
+- UI dependencies will be installed automatically
+
 ### Method 2: Using Python
 
 ```bash
@@ -72,6 +85,8 @@ python -m src.ui.run_dashboard
 cd /Users/aniruth/projects/1password-demo/backend
 streamlit run src/ui/dashboard.py
 ```
+
+**Access**: Dashboard will be available at http://localhost:8501 (or alternative port if 8501 is busy)
 
 ## 📋 Prerequisites
 
@@ -113,11 +128,12 @@ ACP_BEARER_TOKEN=dev-token-change-in-production
 For full functionality, start the backend servers:
 
 ```bash
-# Terminal 1 - A2A Server
-python src/a2a/run_a2a.py
+# Option 1: Start all services at once
+./scripts/start-all.sh
 
-# Terminal 2 - ACP Server
-python src/acp/run_acp.py
+# Option 2: Start individual services
+./scripts/a2a_server.sh
+./scripts/acp_server.sh
 ```
 
 **Note**: MCP testing works directly through the credential manager without requiring a running server.
@@ -277,14 +293,23 @@ Custom CSS is defined in `dashboard.py` at the top:
 poetry install --extras ui
 ```
 
+**Or use the script which handles this automatically:**
+```bash
+./scripts/run_dashboard.sh
+```
+
 ### Protocol Tests Failing
 
 **Error**: Connection refused for A2A/ACP
 
 **Solution**: Start the backend servers
 ```bash
-python src/a2a/run_a2a.py  # Port 8000
-python src/acp/run_acp.py  # Port 8001
+# Option 1: Start all services
+./scripts/start-all.sh
+
+# Option 2: Start individual services
+./scripts/a2a_server.sh  # Port 8000
+./scripts/acp_server.sh   # Port 8001
 ```
 
 ### MCP Tests Failing
