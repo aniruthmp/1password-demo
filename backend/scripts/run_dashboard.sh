@@ -40,15 +40,26 @@ echo -e "${GREEN}✓ Checking dependencies...${NC}"
 cd "$PROJECT_ROOT"
 poetry install --extras ui --no-interaction --quiet
 
+# Check if port is available
+DASHBOARD_PORT=8501
+if lsof -Pi :$DASHBOARD_PORT -sTCP:LISTEN -t >/dev/null ; then
+    echo -e "${YELLOW}Port $DASHBOARD_PORT is already in use. Trying port 8503...${NC}"
+    DASHBOARD_PORT=8503
+    if lsof -Pi :$DASHBOARD_PORT -sTCP:LISTEN -t >/dev/null ; then
+        echo -e "${YELLOW}Port $DASHBOARD_PORT is also in use. Trying port 8504...${NC}"
+        DASHBOARD_PORT=8504
+    fi
+fi
+
 echo -e "${GREEN}✓ Environment loaded${NC}"
 echo -e "${GREEN}✓ Starting Streamlit dashboard...${NC}"
 echo ""
-echo -e "${BLUE}Dashboard will be available at: http://localhost:8501${NC}"
+echo -e "${BLUE}Dashboard will be available at: http://localhost:$DASHBOARD_PORT${NC}"
 echo ""
 
 # Run Streamlit dashboard using Poetry's virtual environment
 poetry run streamlit run src/ui/dashboard.py \
-    --server.port=8501 \
+    --server.port=$DASHBOARD_PORT \
     --server.address=0.0.0.0 \
     --server.headless=true \
     --browser.gatherUsageStats=false

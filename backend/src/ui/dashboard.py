@@ -136,6 +136,181 @@ def add_audit_event(
     st.session_state.audit_events = st.session_state.audit_events[:100]
 
 
+# Audit log reading functions
+def get_audit_log_path() -> Path:
+    """Get the path to the audit log file."""
+    # Get the backend directory (parent of src)
+    backend_dir = Path(__file__).parent.parent.parent
+    return backend_dir / "logs" / "audit.log"
+
+
+def read_audit_log_events(since_timestamp: str | None = None) -> list[dict[str, Any]]:
+    """
+    Read audit log events from the log file.
+    
+    Args:
+        since_timestamp: Only return events after this timestamp (ISO format)
+        
+    Returns:
+        List of parsed audit events
+    """
+    audit_log_path = get_audit_log_path()
+    
+    if not audit_log_path.exists():
+        return []
+    
+    events = []
+    try:
+        with open(audit_log_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                    
+                try:
+                    event = json.loads(line)
+                    
+                    # Filter by timestamp if provided
+                    if since_timestamp and event.get('timestamp', '') <= since_timestamp:
+                        continue
+                        
+                    events.append(event)
+                except json.JSONDecodeError:
+                    # Skip malformed lines
+                    continue
+                    
+    except Exception as e:
+        st.error(f"Error reading audit log: {e}")
+        
+    return events
+
+
+def update_metrics_from_audit_logs():
+    """Update dashboard metrics by reading audit logs."""
+    # Get the last processed timestamp
+    last_processed = st.session_state.get('last_audit_timestamp', None)
+    
+    # Read new events since last check
+    new_events = read_audit_log_events(since_timestamp=last_processed)
+    
+    if not new_events:
+        return
+    
+    # Update timestamp for next check
+    if new_events:
+        st.session_state.last_audit_timestamp = new_events[-1]['timestamp']
+    
+    # Process each new event
+    for event in new_events:
+        protocol = event.get('protocol', '').upper()
+        outcome = event.get('outcome', '')
+        agent_id = event.get('agent_id', 'unknown')
+        resource = event.get('resource', 'unknown')
+        metadata = event.get('metadata', {})
+        
+        # Update counters
+        st.session_state.total_requests += 1
+        
+        if protocol in st.session_state.protocol_counts:
+            st.session_state.protocol_counts[protocol] += 1
+        
+        # Update success/failure counts
+        if outcome in ['success']:
+            st.session_state.success_count += 1
+            
+            # Add to active tokens if it's a successful credential access
+            if event.get('event_type') == 'credential_access' and 'expires_at' in metadata:
+                token_info = {
+                    "token": f"JWT_TOKEN_{len(st.session_state.active_tokens) + 1}",  # Placeholder
+                    "protocol": protocol,
+                    "resource": resource,
+                    "agent_id": agent_id,
+                    "issued_at": datetime.fromisoformat(event['timestamp'].replace('Z', '+00:00')).timestamp(),
+                    "expires_at": metadata.get('expires_at', 0),
+                    "ttl_minutes": metadata.get('ttl_minutes', 5),
+                }
+                st.session_state.active_tokens.append(token_info)
+                
+        elif outcome in ['failure', 'error', 'denied']:
+            st.session_state.failure_count += 1
+        
+        # Add to audit events for display
+        add_audit_event(
+            protocol=protocol,
+            agent_id=agent_id,
+            resource=resource,
+            outcome=outcome,
+            metadata=metadata
+        )
+
+
+def initialize_audit_log_metrics():
+    """Initialize metrics by reading all existing audit logs."""
+    if 'audit_log_initialized' not in st.session_state:
+        # Read all events to initialize metrics
+        all_events = read_audit_log_events()
+        
+        # Reset counters
+        st.session_state.total_requests = 0
+        st.session_state.protocol_counts = {"MCP": 0, "A2A": 0, "ACP": 0}
+        st.session_state.success_count = 0
+        st.session_state.failure_count = 0
+        st.session_state.active_tokens = []
+        st.session_state.audit_events = []
+        
+        # Process all events
+        for event in all_events:
+            protocol = event.get('protocol', '').upper()
+            outcome = event.get('outcome', '')
+            agent_id = event.get('agent_id', 'unknown')
+            resource = event.get('resource', 'unknown')
+            metadata = event.get('metadata', {})
+            
+            # Update counters
+            st.session_state.total_requests += 1
+            
+            if protocol in st.session_state.protocol_counts:
+                st.session_state.protocol_counts[protocol] += 1
+            
+            # Update success/failure counts
+            if outcome in ['success']:
+                st.session_state.success_count += 1
+                
+                # Add to active tokens if it's a successful credential access and not expired
+                if (event.get('event_type') == 'credential_access' and 
+                    'expires_at' in metadata and 
+                    metadata.get('expires_at', 0) > datetime.now(UTC).timestamp()):
+                    
+                    token_info = {
+                        "token": f"JWT_TOKEN_{len(st.session_state.active_tokens) + 1}",  # Placeholder
+                        "protocol": protocol,
+                        "resource": resource,
+                        "agent_id": agent_id,
+                        "issued_at": datetime.fromisoformat(event['timestamp'].replace('Z', '+00:00')).timestamp(),
+                        "expires_at": metadata.get('expires_at', 0),
+                        "ttl_minutes": metadata.get('ttl_minutes', 5),
+                    }
+                    st.session_state.active_tokens.append(token_info)
+                    
+            elif outcome in ['failure', 'error', 'denied']:
+                st.session_state.failure_count += 1
+            
+            # Add to audit events for display
+            add_audit_event(
+                protocol=protocol,
+                agent_id=agent_id,
+                resource=resource,
+                outcome=outcome,
+                metadata=metadata
+            )
+        
+        # Set the last processed timestamp
+        if all_events:
+            st.session_state.last_audit_timestamp = all_events[-1]['timestamp']
+        
+        st.session_state.audit_log_initialized = True
+
+
 # Test protocol functions
 async def test_mcp_protocol(resource_type: str, resource_name: str, agent_id: str):
     """Test MCP protocol by calling the credential manager directly."""
@@ -374,6 +549,12 @@ async def test_acp_protocol(agent_name: str, message: str, requester_id: str):
 # Main dashboard
 def main():
     """Main dashboard rendering function."""
+    # Initialize audit log metrics on first run
+    initialize_audit_log_metrics()
+    
+    # Update metrics from audit logs
+    update_metrics_from_audit_logs()
+    
     # Clean expired tokens
     clean_expired_tokens()
 
@@ -402,6 +583,25 @@ def main():
 
         st.markdown("---")
 
+        # Audit Log Status
+        st.subheader("📋 Audit Log Status")
+        audit_log_path = get_audit_log_path()
+        if audit_log_path.exists():
+            st.success("✓ Audit log file found")
+            st.text(f"Path: {audit_log_path}")
+            
+            # Show last processed timestamp
+            last_processed = st.session_state.get('last_audit_timestamp', 'None')
+            if last_processed != 'None':
+                st.text(f"Last processed: {last_processed[:19]}")
+            else:
+                st.text("Last processed: Not set")
+        else:
+            st.error("✗ Audit log file not found")
+            st.text(f"Expected: {audit_log_path}")
+
+        st.markdown("---")
+
         # Auto-refresh control
         st.subheader("🔄 Auto-Refresh")
         auto_refresh = st.checkbox("Enable auto-refresh", value=True)
@@ -414,7 +614,7 @@ def main():
         st.markdown("---")
 
         # Reset metrics
-        if st.button("🔄 Reset All Metrics", use_container_width=True):
+        if st.button("🔄 Reset All Metrics", width='stretch'):
             st.session_state.total_requests = 0
             st.session_state.active_tokens = []
             st.session_state.protocol_counts = {"MCP": 0, "A2A": 0, "ACP": 0}
@@ -423,6 +623,9 @@ def main():
             st.session_state.audit_events = []
             st.session_state.last_token = None
             st.session_state.start_time = datetime.now(UTC)
+            # Reset audit log tracking
+            st.session_state.last_audit_timestamp = None
+            st.session_state.audit_log_initialized = False
             st.rerun()
 
     # Main content area
@@ -467,7 +670,49 @@ def main():
 
     st.markdown("---")
 
-    # Section 2: Protocol Usage Visualization
+    # Section 2: Available Vault Resources
+    st.header("🗄️ Available 1Password Vault Resources")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.subheader("🖥️ Servers")
+        st.markdown("""
+        - **dev-server** (dev-login)
+        - **staging-server** (stage-login)
+        - **production-server** (prod-login)
+        """)
+    
+    with col2:
+        st.subheader("🔌 APIs")
+        st.markdown("""
+        - **aws-api**
+        - **slack-api**
+        - **github-api**
+        - **stripe-api**
+        - **test-api**
+        """)
+    
+    with col3:
+        st.subheader("🗃️ Databases")
+        st.markdown("""
+        - **dev-mysql** (demo-)
+        - **staging-postgres** (dbuser)
+        - **production-db** (dbuser)
+        - **production-postgres** (test)
+        - **test-database** (dbuser)
+        """)
+    
+    with col4:
+        st.subheader("🔑 SSH & Generic")
+        st.markdown("""
+        - **test-ssh** (SHA256:ms2+8dvzsl/sjzueHVDFAd/...)
+        - **generic** (test)
+        """)
+
+    st.markdown("---")
+
+    # Section 3: Protocol Usage Visualization
     st.header("📈 Protocol Usage")
 
     col1, col2 = st.columns([2, 1])
@@ -485,7 +730,7 @@ def main():
             }
         )
 
-        st.bar_chart(protocol_df.set_index("Protocol"), use_container_width=True)
+        st.bar_chart(protocol_df.set_index("Protocol"), width='stretch')
 
     with col2:
         st.subheader("Protocol Breakdown")
@@ -496,7 +741,7 @@ def main():
 
     st.markdown("---")
 
-    # Section 3: Interactive Protocol Testing
+    # Section 4: Interactive Protocol Testing
     st.header("🧪 Interactive Protocol Testing")
 
     tab1, tab2, tab3 = st.tabs(["MCP Protocol", "A2A Protocol", "ACP Protocol"])
@@ -512,14 +757,41 @@ def main():
         with col1:
             resource_type = st.selectbox(
                 "Resource Type",
-                ["database", "api", "ssh", "generic"],
+                ["server", "api", "database", "ssh", "generic"],
                 key="mcp_resource_type",
             )
-            resource_name = st.text_input(
-                "Resource Name",
-                value="test-database",
-                key="mcp_resource_name",
-            )
+            
+            # Dynamic resource name options based on type
+            if resource_type == "server":
+                resource_name = st.selectbox(
+                    "Server Name",
+                    ["dev-server", "staging-server", "production-server"],
+                    key="mcp_resource_name",
+                )
+            elif resource_type == "api":
+                resource_name = st.selectbox(
+                    "API Name",
+                    ["aws-api", "slack-api", "github-api", "stripe-api", "test-api"],
+                    key="mcp_resource_name",
+                )
+            elif resource_type == "database":
+                resource_name = st.selectbox(
+                    "Database Name",
+                    ["dev-mysql", "staging-postgres", "production-db", "production-postgres", "test-database"],
+                    key="mcp_resource_name",
+                )
+            elif resource_type == "ssh":
+                resource_name = st.selectbox(
+                    "SSH Key Name",
+                    ["test-ssh"],
+                    key="mcp_resource_name",
+                )
+            else:  # generic
+                resource_name = st.selectbox(
+                    "Generic Resource Name",
+                    ["generic"],
+                    key="mcp_resource_name",
+                )
 
         with col2:
             agent_id = st.text_input(
@@ -528,7 +800,7 @@ def main():
                 key="mcp_agent_id",
             )
 
-        if st.button("🚀 Test MCP Protocol", use_container_width=True, key="test_mcp"):
+        if st.button("🚀 Test MCP Protocol", width='stretch', key="test_mcp"):
             with st.spinner("Requesting credentials via MCP..."):
                 result = asyncio.run(
                     test_mcp_protocol(resource_type, resource_name, agent_id)
@@ -559,9 +831,9 @@ def main():
                 ],
                 key="a2a_capability",
             )
-            database_name = st.text_input(
+            database_name = st.selectbox(
                 "Database Name",
-                value="analytics-db",
+                ["dev-mysql", "staging-postgres", "production-db", "production-postgres", "test-database"],
                 key="a2a_database_name",
             )
 
@@ -575,7 +847,7 @@ def main():
                 "Duration (minutes)", min_value=1, max_value=15, value=5, key="a2a_ttl"
             )
 
-        if st.button("🚀 Test A2A Protocol", use_container_width=True, key="test_a2a"):
+        if st.button("🚀 Test A2A Protocol", width='stretch', key="test_a2a"):
             with st.spinner("Requesting credentials via A2A..."):
                 result = asyncio.run(
                     test_a2a_protocol(
@@ -605,7 +877,7 @@ def main():
             )
             message = st.text_area(
                 "Natural Language Request",
-                value="I need database credentials for production-db",
+                value="I need database credentials for production-postgres",
                 key="acp_message",
                 height=100,
             )
@@ -617,7 +889,7 @@ def main():
                 key="acp_requester",
             )
 
-        if st.button("🚀 Test ACP Protocol", use_container_width=True, key="test_acp"):
+        if st.button("🚀 Test ACP Protocol", width='stretch', key="test_acp"):
             with st.spinner("Requesting credentials via ACP..."):
                 result = asyncio.run(test_acp_protocol(agent_name, message, acp_requester))
 
@@ -629,7 +901,7 @@ def main():
 
     st.markdown("---")
 
-    # Section 4: Active Tokens Display
+    # Section 5: Active Tokens Display
     st.header("🎟️ Active Tokens")
 
     if st.session_state.active_tokens:
@@ -664,7 +936,7 @@ def main():
 
     st.markdown("---")
 
-    # Section 5: Audit Event Stream
+    # Section 6: Audit Event Stream
     st.header("📜 Audit Event Stream")
 
     # Filter controls
@@ -717,7 +989,7 @@ def main():
 
             st.dataframe(
                 events_df,
-                use_container_width=True,
+                width='stretch',
                 hide_index=True,
             )
 

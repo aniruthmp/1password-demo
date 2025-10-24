@@ -250,7 +250,7 @@ Edit the port in any startup method:
 # Edit src/ui/run_dashboard.py, change port value
 
 # Direct Streamlit
-streamlit run src/ui/dashboard.py --server.port=8502
+streamlit run src/ui/dashboard.py --server.port=8501
 ```
 
 ### Styling
