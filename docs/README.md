@@ -1,10 +1,23 @@
-# Universal 1Password Agent Credential Broker
+# Documentation Archive
 
-**Multi-Protocol Credential Broker supporting MCP, A2A, and ACP**
+> **⚠️ Note:** This is historical/planning documentation. For the current project documentation, see **[README.md](../README.md)** at the project root.
 
-[![Status](https://img.shields.io/badge/status-planning_complete-green)]()
-[![Phase](https://img.shields.io/badge/phase-ready_for_implementation-blue)]()
-[![Protocols](https://img.shields.io/badge/protocols-MCP%20%7C%20A2A%20%7C%20ACP-orange)]()
+---
+
+## 📚 Historical Documentation
+
+This directory contains planning, implementation, and reference documentation from the project's development phases.
+
+### Documents
+
+| Document | Purpose | Status |
+|----------|---------|--------|
+| **[TODO.md](TODO.md)** | Comprehensive task list (100+ tasks, 8 phases) | ✅ Historical reference |
+| **[IMPLEMENTATION_CHECKLIST.md](IMPLEMENTATION_CHECKLIST.md)** | Progress tracking | ✅ Historical reference |
+| **[PROJECT_ROADMAP.md](PROJECT_ROADMAP.md)** | Visual roadmap, architecture | ✅ Historical reference |
+| **[PLANNING_SUMMARY.md](PLANNING_SUMMARY.md)** | Coverage verification | ✅ Historical reference |
+| **[PRD-ver-1.0.md](PRD-ver-1.0.md)** | Product requirements document | ✅ Historical reference |
+| **[poc.md](poc.md)** | Proof-of-concept technical details | ✅ Historical reference |
 
 ---
 

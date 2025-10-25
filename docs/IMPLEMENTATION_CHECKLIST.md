@@ -86,9 +86,9 @@
 | - Scenario 1: MCP integration | Task 7.2.3 | ✅ |
 | - Scenario 2: A2A collaboration | Task 7.2.3 | ⬜ |
 | - Scenario 3: ACP session | Task 7.2.3 | ⬜ |
-| **Section 10.5: Demo UI (Optional)** | Phase 6 | ⬜ |
-| - Streamlit dashboard | Tasks 6.1.1-6.1.6 | ⬜ |
-| - FastAPI + Tailwind (alt) | Tasks 6.2.1-6.2.6 | ⬜ |
+| **Section 10.5: Demo UI (Optional)** | Phase 6 | ✅ |
+| - Streamlit dashboard | Tasks 6.1.1-6.1.6 | ✅ |
+| - FastAPI + Tailwind (alt) | Tasks 6.2.1-6.2.6 | ✅ |
 
 ---
 
@@ -143,7 +143,7 @@
 
 ### **Day 3: Integration & Polish (3-4 hours)** ✅ COMPLETE
 - [✅] Phase 5: Tasks 5.1.1 - 5.3.2 (Docker, logging) ✅ COMPLETE
-- [✅] Phase 6: Tasks 6.1.1 - 6.1.6 (Streamlit UI - optional) ✅ COMPLETE
+- [✅] Phase 6: Tasks 6.1.1 - 6.1.6 (Streamlit UI) + Tasks 6.2.1 - 6.2.6 (FastAPI UI) ✅ COMPLETE
 - [ ] Phase 7: Tasks 7.1.1 - 7.3.2 (Docs & tests)
 - [ ] Phase 8: Tasks 8.1.1 - 8.2.1 (Final validation)
 
@@ -184,10 +184,10 @@ Before considering the project complete, verify:
 - [ ] Security best practices documented
 
 ### **Optional Enhancements**
-- [ ] Streamlit dashboard operational
-- [ ] Real-time metrics visualization
-- [ ] Interactive protocol testing UI
-- [ ] WebSocket live updates
+- [✅] Streamlit dashboard operational
+- [✅] Real-time metrics visualization
+- [✅] Interactive protocol testing UI
+- [✅] WebSocket live updates
 
 ---
 
