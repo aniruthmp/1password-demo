@@ -491,6 +491,907 @@ cd frontend
 
 ---
 
+## 📖 API Documentation
+
+### MCP Server (Model Context Protocol)
+
+The MCP server provides tools for AI models to request credentials through the Model Context Protocol.
+
+#### Tools Available
+
+| Tool Name | Description | Parameters |
+|-----------|-------------|------------|
+| `get_credentials` | Retrieve ephemeral credentials for a resource | `resource_type`, `resource_name`, `requesting_agent_id` |
+| `list_resources` | List available resources in the vault | `requesting_agent_id` |
+| `get_resource_info` | Get detailed information about a specific resource | `resource_name`, `requesting_agent_id` |
+
+#### Example Usage
+
+```python
+from mcp.client.session import ClientSession
+
+async with ClientSession(read, write) as session:
+    # List available resources
+    resources = await session.call_tool(
+        "list_resources",
+        requesting_agent_id="assistant-001"
+    )
+    
+    # Get credentials for a database
+    result = await session.call_tool(
+        "get_credentials",
+        resource_type="database",
+        resource_name="prod-postgres",
+        requesting_agent_id="assistant-001"
+    )
+    
+    print(f"Token: {result['token']}")
+    print(f"Expires in: {result['expires_in']} seconds")
+```
+
+#### Response Format
+
+```json
+{
+    "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+    "expires_in": 300,
+    "resource": "database/prod-postgres",
+    "agent_id": "assistant-001",
+    "issued_at": "2025-01-24T10:30:00Z"
+}
+```
+
+---
+
+### A2A Server (Agent-to-Agent Protocol)
+
+The A2A server enables agent-to-agent communication for credential requests.
+
+#### Base URL
+```
+http://localhost:8000
+```
+
+#### Authentication
+All endpoints require Bearer token authentication:
+```
+Authorization: Bearer dev-token-change-in-production
+```
+
+#### Endpoints
+
+##### 1. Agent Card Discovery
+**GET** `/agent-card`
+
+Discover the credential broker agent's capabilities.
+
+**Response:**
+```json
+{
+    "agent_id": "1password-credential-broker",
+    "name": "1Password Credential Broker",
+    "version": "1.0.0",
+    "capabilities": [
+        "request_database_credentials",
+        "request_api_credentials", 
+        "request_ssh_credentials",
+        "request_general_credentials"
+    ],
+    "supported_protocols": ["A2A"],
+    "endpoints": {
+        "task_execution": "/task",
+        "health_check": "/health"
+    }
+}
+```
+
+##### 2. Task Execution
+**POST** `/task`
+
+Execute a credential request task.
+
+**Request Body:**
+```json
+{
+    "task_id": "unique-task-id",
+    "capability_name": "request_database_credentials",
+    "parameters": {
+        "database_name": "production-db",
+        "duration_minutes": 5
+    },
+    "requesting_agent_id": "data-processing-agent"
+}
+```
+
+**Response:**
+```json
+{
+    "task_id": "unique-task-id",
+    "status": "completed",
+    "result": {
+        "ephemeral_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+        "expires_in": 300,
+        "resource": "database/production-db",
+        "agent_id": "data-processing-agent"
+    },
+    "execution_time_ms": 150,
+    "timestamp": "2025-01-24T10:30:00Z"
+}
+```
+
+##### 3. Health Check
+**GET** `/health`
+
+Check server health and status.
+
+**Response:**
+```json
+{
+    "status": "healthy",
+    "timestamp": "2025-01-24T10:30:00Z",
+    "version": "1.0.0",
+    "uptime_seconds": 3600,
+    "active_connections": 5
+}
+```
+
+#### Error Responses
+
+**401 Unauthorized:**
+```json
+{
+    "error": "unauthorized",
+    "message": "Invalid or missing bearer token"
+}
+```
+
+**400 Bad Request:**
+```json
+{
+    "error": "bad_request",
+    "message": "Invalid task parameters",
+    "details": {
+        "missing_fields": ["task_id", "capability_name"]
+    }
+}
+```
+
+**500 Internal Server Error:**
+```json
+{
+    "error": "internal_error",
+    "message": "Failed to retrieve credentials from 1Password",
+    "request_id": "req-123456"
+}
+```
+
+---
+
+### ACP Server (Agent Communication Protocol)
+
+The ACP server provides REST API endpoints for natural language credential requests.
+
+#### Base URL
+```
+http://localhost:8001
+```
+
+#### Authentication
+All endpoints require Bearer token authentication:
+```
+Authorization: Bearer dev-token-change-in-production
+```
+
+#### Endpoints
+
+##### 1. Agent Discovery
+**GET** `/agents`
+
+List available agents and their capabilities.
+
+**Response:**
+```json
+{
+    "agents": [
+        {
+            "name": "credential-broker",
+            "description": "1Password Credential Broker for secure credential management",
+            "capabilities": [
+                "database_credentials",
+                "api_credentials",
+                "ssh_credentials",
+                "general_credentials"
+            ],
+            "version": "1.0.0"
+        }
+    ]
+}
+```
+
+##### 2. Run Agent
+**POST** `/run`
+
+Execute a natural language request with an agent.
+
+**Request Body:**
+```json
+{
+    "agent_name": "credential-broker",
+    "input": [
+        {
+            "parts": [
+                {
+                    "content": "I need database credentials for the production database",
+                    "content_type": "text/plain"
+                }
+            ]
+        }
+    ],
+    "session_id": "session-123"
+}
+```
+
+**Response:**
+```json
+{
+    "run_id": "run-456",
+    "session_id": "session-123",
+    "status": "completed",
+    "output": [
+        {
+            "parts": [
+                {
+                    "content": "I've retrieved the database credentials for the production database. Here are the details:",
+                    "content_type": "text/plain"
+                },
+                {
+                    "content": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+                    "content_type": "application/jwt"
+                }
+            ]
+        }
+    ],
+    "execution_time_ms": 200,
+    "timestamp": "2025-01-24T10:30:00Z"
+}
+```
+
+##### 3. Session History
+**GET** `/sessions/{session_id}`
+
+Retrieve the history of interactions for a session.
+
+**Response:**
+```json
+{
+    "session_id": "session-123",
+    "interactions": [
+        {
+            "run_id": "run-456",
+            "timestamp": "2025-01-24T10:30:00Z",
+            "request_summary": "I need database credentials for the production database",
+            "response_summary": "Retrieved database credentials",
+            "status": "completed"
+        }
+    ],
+    "total_interactions": 1,
+    "created_at": "2025-01-24T10:30:00Z"
+}
+```
+
+##### 4. Health Check
+**GET** `/health`
+
+Check server health and status.
+
+**Response:**
+```json
+{
+    "status": "healthy",
+    "timestamp": "2025-01-24T10:30:00Z",
+    "version": "1.0.0",
+    "uptime_seconds": 3600,
+    "active_sessions": 3
+}
+```
+
+#### Error Responses
+
+**401 Unauthorized:**
+```json
+{
+    "error": "unauthorized",
+    "message": "Invalid or missing bearer token"
+}
+```
+
+**400 Bad Request:**
+```json
+{
+    "error": "bad_request",
+    "message": "Invalid request format",
+    "details": {
+        "missing_fields": ["agent_name", "input"]
+    }
+}
+```
+
+**404 Not Found:**
+```json
+{
+    "error": "not_found",
+    "message": "Agent not found",
+    "details": {
+        "agent_name": "non-existent-agent"
+    }
+}
+```
+
+---
+
+## 🚀 Deployment Guide
+
+### Production Deployment
+
+This guide covers deploying the Universal 1Password Agent Credential Broker in production environments.
+
+#### Prerequisites
+
+- Docker and Docker Compose
+- 1Password Connect Server (self-hosted or cloud)
+- Valid 1Password Connect API token
+- Domain name and SSL certificates (for production)
+- Reverse proxy (nginx/traefik) for load balancing
+
+#### Environment Setup
+
+##### 1. 1Password Connect Server
+
+**Self-Hosted Option:**
+```bash
+# Download 1Password Connect Server
+wget https://cache.agilebits.com/dist/1P/op2/pkg/v2.24.0/op2_linux_amd64_v2.24.0.zip
+unzip op2_linux_amd64_v2.24.0.zip
+sudo mv op2 /usr/local/bin/
+
+# Start Connect Server
+op2 connect server --config /etc/1password/connect.json
+```
+
+**Cloud Option:**
+Use 1Password's managed Connect service.
+
+##### 2. Environment Variables
+
+Create production `.env` file:
+
+```env
+# 1Password Connect Configuration
+OP_CONNECT_HOST=https://your-connect-server.com
+OP_CONNECT_TOKEN=your-production-connect-token
+OP_VAULT_ID=your-production-vault-id
+
+# JWT Configuration
+JWT_SECRET_KEY=your-32-character-production-secret-key
+TOKEN_TTL_MINUTES=5
+
+# Server Configuration
+A2A_SERVER_URL=https://your-domain.com/a2a
+ACP_SERVER_URL=https://your-domain.com/acp
+A2A_BEARER_TOKEN=your-production-a2a-bearer-token
+ACP_BEARER_TOKEN=your-production-acp-bearer-token
+
+# Security
+ALLOWED_ORIGINS=https://your-domain.com,https://your-dashboard.com
+CORS_ENABLED=true
+
+# Logging
+LOG_LEVEL=INFO
+AUDIT_LOG_ENABLED=true
+```
+
+#### Docker Deployment
+
+##### 1. Production Docker Compose
+
+Create `docker-compose.prod.yml`:
+
+```yaml
+version: '3.8'
+
+services:
+  a2a-server:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.a2a
+    ports:
+      - "8000:8000"
+    environment:
+      - OP_CONNECT_HOST=${OP_CONNECT_HOST}
+      - OP_CONNECT_TOKEN=${OP_CONNECT_TOKEN}
+      - OP_VAULT_ID=${OP_VAULT_ID}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - A2A_BEARER_TOKEN=${A2A_BEARER_TOKEN}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  acp-server:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.acp
+    ports:
+      - "8001:8001"
+    environment:
+      - OP_CONNECT_HOST=${OP_CONNECT_HOST}
+      - OP_CONNECT_TOKEN=${OP_CONNECT_TOKEN}
+      - OP_VAULT_ID=${OP_VAULT_ID}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - ACP_BEARER_TOKEN=${ACP_BEARER_TOKEN}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  dashboard:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - A2A_SERVER_URL=${A2A_SERVER_URL}
+      - ACP_SERVER_URL=${ACP_SERVER_URL}
+      - A2A_BEARER_TOKEN=${A2A_BEARER_TOKEN}
+      - ACP_BEARER_TOKEN=${ACP_BEARER_TOKEN}
+    restart: unless-stopped
+    depends_on:
+      - a2a-server
+      - acp-server
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    restart: unless-stopped
+    depends_on:
+      - a2a-server
+      - acp-server
+      - dashboard
+```
+
+##### 2. Nginx Configuration
+
+Create `nginx.conf`:
+
+```nginx
+events {
+    worker_connections 1024;
+}
+
+http {
+    upstream a2a_backend {
+        server a2a-server:8000;
+    }
+    
+    upstream acp_backend {
+        server acp-server:8001;
+    }
+    
+    upstream dashboard_backend {
+        server dashboard:3000;
+    }
+
+    server {
+        listen 80;
+        server_name your-domain.com;
+        return 301 https://$server_name$request_uri;
+    }
+
+    server {
+        listen 443 ssl;
+        server_name your-domain.com;
+
+        ssl_certificate /etc/nginx/ssl/cert.pem;
+        ssl_certificate_key /etc/nginx/ssl/key.pem;
+
+        # A2A API
+        location /a2a/ {
+            proxy_pass http://a2a_backend/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # ACP API
+        location /acp/ {
+            proxy_pass http://acp_backend/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # Dashboard
+        location / {
+            proxy_pass http://dashboard_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+        }
+    }
+}
+```
+
+##### 3. Deploy with Docker Compose
+
+```bash
+# Start production services
+docker-compose -f docker-compose.prod.yml up -d
+
+# Check service health
+docker-compose -f docker-compose.prod.yml ps
+
+# View logs
+docker-compose -f docker-compose.prod.yml logs -f
+```
+
+#### Kubernetes Deployment
+
+##### 1. Namespace
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: 1password-broker
+```
+
+##### 2. ConfigMap
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: broker-config
+  namespace: 1password-broker
+data:
+  OP_CONNECT_HOST: "https://your-connect-server.com"
+  OP_VAULT_ID: "your-vault-id"
+  TOKEN_TTL_MINUTES: "5"
+  LOG_LEVEL: "INFO"
+```
+
+##### 3. Secret
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: broker-secrets
+  namespace: 1password-broker
+type: Opaque
+data:
+  OP_CONNECT_TOKEN: <base64-encoded-token>
+  JWT_SECRET_KEY: <base64-encoded-secret>
+  A2A_BEARER_TOKEN: <base64-encoded-token>
+  ACP_BEARER_TOKEN: <base64-encoded-token>
+```
+
+##### 4. A2A Server Deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: a2a-server
+  namespace: 1password-broker
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: a2a-server
+  template:
+    metadata:
+      labels:
+        app: a2a-server
+    spec:
+      containers:
+      - name: a2a-server
+        image: your-registry/1password-broker:a2a-latest
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - configMapRef:
+            name: broker-config
+        - secretRef:
+            name: broker-secrets
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: a2a-service
+  namespace: 1password-broker
+spec:
+  selector:
+    app: a2a-server
+  ports:
+  - port: 8000
+    targetPort: 8000
+  type: ClusterIP
+```
+
+##### 5. ACP Server Deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: acp-server
+  namespace: 1password-broker
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: acp-server
+  template:
+    metadata:
+      labels:
+        app: acp-server
+    spec:
+      containers:
+      - name: acp-server
+        image: your-registry/1password-broker:acp-latest
+        ports:
+        - containerPort: 8001
+        envFrom:
+        - configMapRef:
+            name: broker-config
+        - secretRef:
+            name: broker-secrets
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: acp-service
+  namespace: 1password-broker
+spec:
+  selector:
+    app: acp-server
+  ports:
+  - port: 8001
+    targetPort: 8001
+  type: ClusterIP
+```
+
+##### 6. Ingress
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: broker-ingress
+  namespace: 1password-broker
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+  - hosts:
+    - your-domain.com
+    secretName: broker-tls
+  rules:
+  - host: your-domain.com
+    http:
+      paths:
+      - path: /a2a
+        pathType: Prefix
+        backend:
+          service:
+            name: a2a-service
+            port:
+              number: 8000
+      - path: /acp
+        pathType: Prefix
+        backend:
+          service:
+            name: acp-service
+            port:
+              number: 8001
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: dashboard-service
+            port:
+              number: 3000
+```
+
+#### Security Best Practices
+
+##### 1. Network Security
+
+- Use TLS/HTTPS for all communications
+- Implement network segmentation
+- Use firewall rules to restrict access
+- Enable DDoS protection
+
+##### 2. Authentication & Authorization
+
+- Use strong, unique bearer tokens
+- Implement token rotation
+- Use RBAC for Kubernetes deployments
+- Enable audit logging
+
+##### 3. Secrets Management
+
+- Store secrets in secure vaults (HashiCorp Vault, AWS Secrets Manager)
+- Use Kubernetes secrets with encryption at rest
+- Implement secret rotation
+- Never commit secrets to version control
+
+##### 4. Monitoring & Observability
+
+- Enable comprehensive logging
+- Implement metrics collection (Prometheus/Grafana)
+- Set up alerting for failures
+- Monitor resource usage
+
+#### Monitoring Setup
+
+##### 1. Prometheus Configuration
+
+```yaml
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+- job_name: 'a2a-server'
+  static_configs:
+  - targets: ['a2a-server:8000']
+  metrics_path: /metrics
+
+- job_name: 'acp-server'
+  static_configs:
+  - targets: ['acp-server:8001']
+  metrics_path: /metrics
+```
+
+##### 2. Grafana Dashboard
+
+Create dashboards for:
+- Request rate and latency
+- Error rates
+- Token generation metrics
+- Resource utilization
+- Audit log events
+
+##### 3. Alerting Rules
+
+```yaml
+groups:
+- name: broker-alerts
+  rules:
+  - alert: HighErrorRate
+    expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High error rate detected"
+      
+  - alert: ServiceDown
+    expr: up == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Service is down"
+```
+
+#### Backup & Recovery
+
+##### 1. Configuration Backup
+
+```bash
+# Backup environment configuration
+kubectl get configmap broker-config -o yaml > backup/configmap.yaml
+kubectl get secret broker-secrets -o yaml > backup/secret.yaml
+```
+
+##### 2. Disaster Recovery
+
+- Maintain backup 1Password Connect Server
+- Document recovery procedures
+- Test recovery processes regularly
+- Implement automated failover
+
+#### Troubleshooting
+
+##### Common Issues
+
+**1. Services Not Starting**
+```bash
+# Check logs
+docker-compose logs a2a-server
+kubectl logs -f deployment/a2a-server
+
+# Verify environment variables
+docker-compose exec a2a-server env | grep OP_
+```
+
+**2. Authentication Failures**
+```bash
+# Test 1Password Connect
+curl -H "Authorization: Bearer $OP_CONNECT_TOKEN" \
+     "$OP_CONNECT_HOST/v1/vaults"
+
+# Verify bearer tokens
+curl -H "Authorization: Bearer $A2A_BEARER_TOKEN" \
+     "http://localhost:8000/health"
+```
+
+**3. Performance Issues**
+```bash
+# Check resource usage
+docker stats
+kubectl top pods
+
+# Monitor request latency
+curl -w "@curl-format.txt" -o /dev/null -s "http://localhost:8000/health"
+```
+
+#### Production Checklist
+
+- [ ] SSL certificates configured
+- [ ] Environment variables set
+- [ ] Health checks working
+- [ ] Monitoring configured
+- [ ] Backup procedures tested
+- [ ] Security review completed
+- [ ] Load testing performed
+- [ ] Documentation updated
+
+---
+
 **Last Updated:** October 24, 2025  
 **Version:** 1.0.0  
 **Status:** ✅ Operational

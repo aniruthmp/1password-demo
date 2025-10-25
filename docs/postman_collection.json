@@ -1,0 +1,365 @@
+{
+  "info": {
+    "name": "1Password Credential Broker API",
+    "description": "Collection for testing the Universal 1Password Agent Credential Broker APIs",
+    "version": "1.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url_a2a",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "base_url_acp",
+      "value": "http://localhost:8001",
+      "type": "string"
+    },
+    {
+      "key": "bearer_token",
+      "value": "dev-token-change-in-production",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{bearer_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "A2A Protocol",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_a2a}}/health",
+              "host": ["{{base_url_a2a}}"],
+              "path": ["health"]
+            }
+          }
+        },
+        {
+          "name": "Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_a2a}}/status",
+              "host": ["{{base_url_a2a}}"],
+              "path": ["status"]
+            }
+          }
+        },
+        {
+          "name": "Get Agent Card",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_a2a}}/agent-card",
+              "host": ["{{base_url_a2a}}"],
+              "path": ["agent-card"]
+            }
+          }
+        },
+        {
+          "name": "Request Database Credentials",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"task_id\": \"test-db-task\",\n  \"capability_name\": \"request_database_credentials\",\n  \"parameters\": {\n    \"database_name\": \"test-database\",\n    \"duration_minutes\": 5\n  },\n  \"requesting_agent_id\": \"test-agent\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url_a2a}}/task",
+              "host": ["{{base_url_a2a}}"],
+              "path": ["task"]
+            }
+          }
+        },
+        {
+          "name": "Request API Credentials",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"task_id\": \"test-api-task\",\n  \"capability_name\": \"request_api_credentials\",\n  \"parameters\": {\n    \"api_name\": \"test-api\",\n    \"scopes\": [\"read\", \"write\"],\n    \"duration_minutes\": 10\n  },\n  \"requesting_agent_id\": \"test-agent\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url_a2a}}/task",
+              "host": ["{{base_url_a2a}}"],
+              "path": ["task"]
+            }
+          }
+        },
+        {
+          "name": "Request SSH Credentials",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"task_id\": \"test-ssh-task\",\n  \"capability_name\": \"request_ssh_credentials\",\n  \"parameters\": {\n    \"ssh_key_name\": \"deployment-key\",\n    \"duration_minutes\": 15\n  },\n  \"requesting_agent_id\": \"test-agent\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url_a2a}}/task",
+              "host": ["{{base_url_a2a}}"],
+              "path": ["task"]
+            }
+          }
+        },
+        {
+          "name": "Request Generic Secret",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"task_id\": \"test-secret-task\",\n  \"capability_name\": \"request_generic_secret\",\n  \"parameters\": {\n    \"secret_name\": \"api-key\",\n    \"duration_minutes\": 5\n  },\n  \"requesting_agent_id\": \"test-agent\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url_a2a}}/task",
+              "host": ["{{base_url_a2a}}"],
+              "path": ["task"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "ACP Protocol",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_acp}}/health",
+              "host": ["{{base_url_acp}}"],
+              "path": ["health"]
+            }
+          }
+        },
+        {
+          "name": "Get Agents",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_acp}}/agents",
+              "host": ["{{base_url_acp}}"],
+              "path": ["agents"]
+            }
+          }
+        },
+        {
+          "name": "Run Database Credentials Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"agent_name\": \"credential-broker\",\n  \"input\": [\n    {\n      \"parts\": [\n        {\n          \"content\": \"I need database credentials for production-db\",\n          \"content_type\": \"text/plain\"\n        }\n      ]\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url_acp}}/run",
+              "host": ["{{base_url_acp}}"],
+              "path": ["run"]
+            }
+          }
+        },
+        {
+          "name": "Run API Credentials Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"agent_name\": \"credential-broker\",\n  \"input\": [\n    {\n      \"parts\": [\n        {\n          \"content\": \"Get me API credentials for the analytics service with read and write scopes\",\n          \"content_type\": \"text/plain\"\n        }\n      ]\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url_acp}}/run",
+              "host": ["{{base_url_acp}}"],
+              "path": ["run"]
+            }
+          }
+        },
+        {
+          "name": "Run SSH Credentials Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"agent_name\": \"credential-broker\",\n  \"input\": [\n    {\n      \"parts\": [\n        {\n          \"content\": \"I need SSH credentials for the deployment server\",\n          \"content_type\": \"text/plain\"\n        }\n      ]\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url_acp}}/run",
+              "host": ["{{base_url_acp}}"],
+              "path": ["run"]
+            }
+          }
+        },
+        {
+          "name": "Run with Session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"agent_name\": \"credential-broker\",\n  \"input\": [\n    {\n      \"parts\": [\n        {\n          \"content\": \"I need database credentials for staging-db\",\n          \"content_type\": \"text/plain\"\n        }\n      ]\n    }\n  ],\n  \"session_id\": \"test-session-123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url_acp}}/run",
+              "host": ["{{base_url_acp}}"],
+              "path": ["run"]
+            }
+          }
+        },
+        {
+          "name": "Get Session History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_acp}}/sessions/test-session-123",
+              "host": ["{{base_url_acp}}"],
+              "path": ["sessions", "test-session-123"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Error Testing",
+      "item": [
+        {
+          "name": "Unauthorized Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "invalid-token",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"task_id\": \"test-task\",\n  \"capability_name\": \"request_database_credentials\",\n  \"parameters\": {\n    \"database_name\": \"test-db\"\n  },\n  \"requesting_agent_id\": \"test-agent\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url_a2a}}/task",
+              "host": ["{{base_url_a2a}}"],
+              "path": ["task"]
+            }
+          }
+        },
+        {
+          "name": "Invalid Capability",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"task_id\": \"test-task\",\n  \"capability_name\": \"invalid_capability\",\n  \"parameters\": {\n    \"database_name\": \"test-db\"\n  },\n  \"requesting_agent_id\": \"test-agent\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url_a2a}}/task",
+              "host": ["{{base_url_a2a}}"],
+              "path": ["task"]
+            }
+          }
+        },
+        {
+          "name": "Missing Parameters",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"task_id\": \"test-task\",\n  \"capability_name\": \"request_database_credentials\",\n  \"parameters\": {},\n  \"requesting_agent_id\": \"test-agent\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url_a2a}}/task",
+              "host": ["{{base_url_a2a}}"],
+              "path": ["task"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

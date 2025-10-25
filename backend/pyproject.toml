@@ -3,7 +3,6 @@ name = "onepassword-credential-broker"
 version = "1.0.0"
 description = "Universal 1Password Agent Credential Broker supporting MCP, A2A, and ACP protocols"
 authors = ["Your Name <your.email@example.com>"]
-readme = "README.md"
 packages = [{include = "src"}]
 
 [tool.poetry.dependencies]
@@ -32,6 +31,7 @@ ruff = ">=0.5.0"
 mypy = ">=1.10.0"
 ipython = ">=8.25.0"
 ipdb = ">=0.13.13"
+requests = ">=2.31.0"
 
 [tool.poetry.extras]
 ui = ["streamlit", "pandas"]
