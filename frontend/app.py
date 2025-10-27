@@ -308,6 +308,69 @@ async def get_dashboard():
             </div>
         </section>
 
+        <!-- Available Resources -->
+        <section class="mb-8">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">📋 Available 1Password Vault Resources</h2>
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <!-- Servers -->
+                    <div>
+                        <div class="flex items-center mb-3">
+                            <span class="text-2xl mr-2">🖥️</span>
+                            <h3 class="font-semibold text-gray-800">Servers</h3>
+                        </div>
+                        <ul class="space-y-1 text-sm text-gray-600 font-mono">
+                            <li>• dev-server (dev-login)</li>
+                            <li>• staging-server (stage-login)</li>
+                            <li>• production-server (prod-login)</li>
+                        </ul>
+                    </div>
+                    
+                    <!-- APIs -->
+                    <div>
+                        <div class="flex items-center mb-3">
+                            <span class="text-2xl mr-2">🔌</span>
+                            <h3 class="font-semibold text-gray-800">APIs</h3>
+                        </div>
+                        <ul class="space-y-1 text-sm text-gray-600 font-mono">
+                            <li>• aws-api</li>
+                            <li>• slack-api</li>
+                            <li>• github-api</li>
+                            <li>• stripe-api</li>
+                            <li>• test-api</li>
+                        </ul>
+                    </div>
+                    
+                    <!-- Databases -->
+                    <div>
+                        <div class="flex items-center mb-3">
+                            <span class="text-2xl mr-2">🗄️</span>
+                            <h3 class="font-semibold text-gray-800">Databases</h3>
+                        </div>
+                        <ul class="space-y-1 text-sm text-gray-600 font-mono">
+                            <li>• dev-mysql (demo-)</li>
+                            <li>• staging-postgres (dbuser)</li>
+                            <li>• production-db (dbuser)</li>
+                            <li>• production-postgres (test)</li>
+                            <li>• test-database (dbuser)</li>
+                        </ul>
+                    </div>
+                    
+                    <!-- SSH & Generic -->
+                    <div>
+                        <div class="flex items-center mb-3">
+                            <span class="text-2xl mr-2">🔑</span>
+                            <h3 class="font-semibold text-gray-800">SSH & Generic</h3>
+                        </div>
+                        <ul class="space-y-1 text-sm text-gray-600 font-mono">
+                            <li>• test-ssh (SHA256:ms2+...)</li>
+                            <li>• generic (test)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- Protocol Testing -->
         <section class="mb-8">
             <h2 class="text-2xl font-bold text-gray-800 mb-4">🧪 Interactive Protocol Testing</h2>
